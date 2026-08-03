@@ -1,0 +1,31 @@
+# Visual Studio 用户和缓存文件
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# 常见编译目录
+Debug/
+Release/
+x64/
+x86/
+build/
+out/
+
+# CMake 生成文件
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+
+# 编译生成文件
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.exp
+*.log
+
+# 本地环境变量和敏感配置
+.env
