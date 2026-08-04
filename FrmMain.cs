@@ -264,22 +264,32 @@ namespace UI
 
                     foreach (var layerPair in layerShapesMap)
                     {
-                        TreeNode componentNode = layerPair.Key;
+                        TreeNode groupNode = layerPair.Key;
+                        List<int> shapeIds = layerPair.Value;
 
-                        // 只导出 Component，普通 DXF 图层和帘线图层不参与
-                        if (!componentNode.Text.StartsWith(
-                                "Component",
-                                StringComparison.Ordinal))
+                        // 跳过没有任何几何对象的空图层
+                        if (groupNode == null ||
+                            shapeIds == null ||
+                            shapeIds.Count == 0)
                         {
                             continue;
                         }
 
-                        string componentName = componentNode.Text
+                        // 清理树节点上用于界面显示的状态文字
+                        string groupName = groupNode.Text
                             .Replace(" (Current)", "")
-                            .Replace(" [已隐藏]", "");
+                            .Replace(" [已隐藏]", "")
+                            .Trim();
 
-                        componentNames.Add(componentName);
-                        componentShapeGroups.Add(layerPair.Value.ToArray());
+                        // 防止节点名称为空
+                        if (string.IsNullOrWhiteSpace(groupName))
+                        {
+                            groupName = $"GeometryGroup_{componentNames.Count + 1}";
+                        }
+
+                        // Component、普通 DXF 图层和帘线图层全部参与导出
+                        componentNames.Add(groupName);
+                        componentShapeGroups.Add(shapeIds.ToArray());
                     }
 
                     // C# 的 int[][] 对应 C++/CLI 的 array<array<int>^>^
@@ -476,9 +486,9 @@ namespace UI
             }
 
             // 2. 线段数量防御
-            if (selectedLinesForFace.Count < 3)
+            if (selectedLinesForFace.Count == 0)
             {
-                MessageBox.Show("生成面至少需要 3 条线段！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("请至少选择一条能够形成闭合区域的线！", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -511,7 +521,7 @@ namespace UI
             }
             else
             {
-                LogMessage("面创建失败：请检查这些线条是否【首尾完全闭合】且【处于同一平面】！");
+                LogMessage("面创建失败：所选线条没有形成可识别的闭合区域，请检查是否共面或存在交叉分叉。");
                 globalShapeId--; // 失败了把 ID 还回去
             }
         }
