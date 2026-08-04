@@ -1,224 +1,192 @@
-// include required OCCT headers
-//国延林新增头文件
-#include <BRepBuilderAPI_MakeWire.hxx>
-#include <BRepTools_WireExplorer.hxx>
-#include <BRep_Tool.hxx>
-#include <GeomConvert_CompCurveToBSplineCurve.hxx>
+// ============================================================================
+// Active headers, grouped by responsibility.
+// Legacy headers are preserved in the disabled block below for easy recovery.
+// ============================================================================
+
+#pragma region CppCli_And_Standard_Library
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <map>
+#include <vector>
+#include <vcclr.h>
+#include <NCollection_Haft.h>
+#pragma endregion
+
+#pragma region OCCT_Core_And_Geometry
+#include <Standard.hxx>
+#include <Standard_Boolean.hxx>
+#include <Standard_Failure.hxx>
+#include <Standard_Handle.hxx>
+#include <Standard_Integer.hxx>
+#include <Standard_Version.hxx>
+#include <Precision.hxx>
+
+#include <gp_Ax2.hxx>
+#include <gp_Circ.hxx>
+#include <gp_Pnt.hxx>
+#include <gp_Vec.hxx>
+
+#include <Geom_Curve.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
-#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <GeomAbs_CurveType.hxx>
+#include <GeomConvert_CompCurveToBSplineCurve.hxx>
+#include <GeomAPI_PointsToBSpline.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
+#include <GC_MakeArcOfCircle.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
+#include <GCPnts_UniformAbscissa.hxx>
+#include <TColgp_HArray1OfPnt.hxx>
+
+#include <BRepAdaptor_Curve.hxx>
+#include <Extrema_ExtElC.hxx>
+#include <Extrema_POnCurv.hxx>
+#pragma endregion
+
+#pragma region OCCT_Topology_And_Modeling
+#include <TopAbs_ShapeEnum.hxx>
 #include <TopoDS.hxx>
-#include <gp_Pnt.hxx>
+#include <TopoDS_Shape.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopoDS_Wire.hxx>
+#include <TopoDS_Face.hxx>
+#include <TopoDS_Compound.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopLoc_Location.hxx>
+
+#include <BRep_Tool.hxx>
+#include <BRep_Builder.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
+
+#include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
-#include <TopTools_ListOfShape.hxx>
-#include <TopTools_ListIteratorOfListOfShape.hxx>
-#include <TopTools_HSequenceOfShape.hxx>
-#include <Prs3d_LineAspect.hxx>
-#include <Graphic3d_NameOfMaterial.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepGProp.hxx>
-#include <GProp_GProps.hxx>
-#include <GCPnts_UniformAbscissa.hxx>
-#include <GeomAPI_PointsToBSpline.hxx>
-#include <GeomAPI_ProjectPointOnCurve.hxx>
-#include <TColgp_HArray1OfPnt.hxx>
-#include <BRepAdaptor_Curve.hxx>
-#include <GeomAbs_CurveType.hxx>
-#include <Extrema_ExtElC.hxx>
-#include <Extrema_POnCurv.hxx>
-#include <Precision.hxx>
-#include <GCPnts_AbscissaPoint.hxx>
-#include <TColgp_HSequenceOfPnt.hxx>
-#include <Prs3d_Drawer.hxx>
-#include <Prs3d_LineAspect.hxx>
-#include <Graphic3d_RenderingParams.hxx>
-#include <AIS_ListOfInteractive.hxx>
-#include <AIS_ListIteratorOfListOfInteractive.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
-#include <set>
-#include <algorithm>
-#include <limits>
+#include <GProp_GProps.hxx>
 
+#include <TopTools_HSequenceOfShape.hxx>
+#include <TopTools_ListIteratorOfListOfShape.hxx>
+#include <TopTools_ListOfShape.hxx>
+#pragma endregion
 
-
-
-
-
-
-
-
-
-
-
-
-#include <vector>
-#include <iostream>  
-#include <cmath>  
-#include <iomanip> // 用于设置输出精度
-#include <Standard.hxx>
-#include <Standard_DefineAlloc.hxx>
-#include <Standard_Handle.hxx>
-#include <Standard_Version.hxx>
-#include <Standard_DefineAlloc.hxx>
-#include <Geom_Line.hxx>//判断直线是直线所需的头文件
-#include <Geom_Circle.hxx>//判断直线是圆弧所需的头文件
-#include <Geom_Curve.hxx> //获取圆心所需头文件****
-#include <Geom_TrimmedCurve.hxx>//圆弧所需头文件
-#include <gp_Circ.hxx>//获取圆心所需头文件****
-#include <Geom_BSplineCurve.hxx>//nurbs曲线
-#include <GC_MakeArcOfCircle.hxx>
-
-#include <BRepPrimAPI_MakeBox.hxx>//长方体
-#include <BRepPrimAPI_MakeWedge.hxx>//楔形
-#include <BRepPrimAPI_MakeOneAxis.hxx>//所有旋转体图元的基类
-#include <BRepBuilderAPI_MakeShape.hxx>
-#include <ShapeFix_Shape.hxx>
-#include <BRepPrimAPI_MakeCylinder.hxx>//圆柱体
-#include <BRepPrimAPI_MakeCone.hxx>//圆锥
-#include <BRepPrimAPI_MakeSphere.hxx>//球体
-#include <BRepPrimAPI_MakeTorus.hxx>//圆环
-#include <BRepPrimAPI_MakePrism.hxx>//拉伸体
-#include <BRepPrimAPI_MakeRevol.hxx>//旋转体
-//gp_Vec
-#include <gp_VectorWithNullMagnitude.hxx>
-#include <gp_XYZ.hxx>
-#include <Standard_ConstructionError.hxx>
-#include <Standard_DomainError.hxx>
-#include <Standard_OutOfRange.hxx>
-#include <gp_Vec.hxx>
-//gp_Vec
-#include <Message_ProgressIndicator.hxx>
-#include <Message_ProgressScope.hxx>
-//for OCC graphic
+#pragma region OCCT_Viewer
 #include <Aspect_DisplayConnection.hxx>
 #include <WNT_Window.hxx>
 #include <OpenGl_GraphicDriver.hxx>
-//for object display
-#include <V3d_Viewer.hxx>
 #include <V3d_View.hxx>
+#include <V3d_Viewer.hxx>
+
 #include <AIS_InteractiveContext.hxx>
+#include <AIS_ListIteratorOfListOfInteractive.hxx>
+#include <AIS_ListOfInteractive.hxx>
 #include <AIS_Shape.hxx>
-//topology
-#include <TopoDS_Shape.hxx>
-#include <TopoDS.hxx>//后面有“::”的名称一定是类名或命名空间名，是没有加这个头文件
-#include <TopoDS_Vertex.hxx>
-#include <TopoDS_Edge.hxx>
-#include <TopoDS_Compound.hxx>
-#include <TopExp_Explorer.hxx>
-#include <TopoDS_Face.hxx>
-//brep tools
-#include <BRep_Builder.hxx>
+#include <AIS_ViewCube.hxx>
+
+#include <Graphic3d_RenderingParams.hxx>
+#include <Prs3d_Drawer.hxx>
+#include <Prs3d_LineAspect.hxx>
+#include <Quantity_Color.hxx>
+#pragma endregion
+
+#pragma region STEP_XCAF_Export
+#include <IFSelect_ReturnStatus.hxx>
+#include <Interface_Static.hxx>
+#include <STEPControl_Writer.hxx>
+#include <STEPCAFControl_Writer.hxx>
+
+#include <TCollection_AsciiString.hxx>
+#include <TCollection_ExtendedString.hxx>
+#include <TDataStd_Name.hxx>
+#include <TDF_Label.hxx>
+#include <TDocStd_Document.hxx>
+#include <XCAFApp_Application.hxx>
+#include <XCAFDoc_DocumentTool.hxx>
+#include <XCAFDoc_ShapeTool.hxx>
+#pragma endregion
+
+#if 0 // UNUSED_LEGACY_HEADERS
+// Generic and duplicate legacy headers
+#include <iostream>
+#include <iomanip>
+#include <set>
+#include <Standard_DefineAlloc.hxx>
+#include <Standard_OStream.hxx>
+#include <Standard_Type.hxx>
+#include <Standard_ConstructionError.hxx>
+#include <Standard_DomainError.hxx>
+#include <Standard_OutOfRange.hxx>
+#include <gp_VectorWithNullMagnitude.hxx>
+#include <gp_XYZ.hxx>
+#include <Geom_Line.hxx>
+#include <Geom_Circle.hxx>
+#include <TColgp_HSequenceOfPnt.hxx>
+#include <TopTools_MapOfShape.hxx>
+#include <TopTools_SequenceOfShape.hxx>
+
+// Legacy import/export headers
 #include <BRepTools.hxx>
-// iges I/E
 #include <IGESControl_Reader.hxx>
 #include <IGESControl_Controller.hxx>
 #include <IGESControl_Writer.hxx>
-#include <IFSelect_ReturnStatus.hxx>
-#include <Interface_Static.hxx>
-//step I/E
 #include <STEPControl_Reader.hxx>
-#include <STEPControl_Writer.hxx>
-//StepReader2
 #include <STEPCAFControl_Reader.hxx>
-#include <XCAFDoc_DocumentTool.hxx>
-#include <XCAFDoc.hxx>
 #include <XCAFPrs_AISObject.hxx>
 #include <Resource_FormatType.hxx>
-#include <STEPControl_Reader.hxx>
-#include <IFSelect_ReturnStatus.hxx>
+#include <StlAPI_Writer.hxx>
+#include <VrmlAPI_Writer.hxx>
+
+// Legacy primitive and interactive modeling headers
+#include <BRepBuilderAPI_MakeShape.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepPrimAPI_MakeWedge.hxx>
+#include <BRepPrimAPI_MakeOneAxis.hxx>
+#include <BRepPrimAPI_MakeCylinder.hxx>
+#include <BRepPrimAPI_MakeCone.hxx>
+#include <BRepPrimAPI_MakeSphere.hxx>
+#include <BRepPrimAPI_MakeTorus.hxx>
+#include <BRepPrimAPI_MakePrism.hxx>
+#include <BRepPrimAPI_MakeRevol.hxx>
+#include <ShapeFix_Shape.hxx>
+#include <gce_MakeLin.hxx>
+#include <gce_MakePln.hxx>
+#include <ProjLib.hxx>
+#include <ElSLib.hxx>
+#include <BRepAlgoAPI_Section.hxx>
+#include <BRepAlgoAPI_Common.hxx>
+#include <BRepAlgoAPI_Fuse.hxx>
+
+// Legacy progress and XCAF reader internals
+#include <Message_ProgressIndicator.hxx>
+#include <Message_ProgressScope.hxx>
+#include <Graphic3d_NameOfMaterial.hxx>
+#include <TDF_AttributeIndexedMap.hxx>
+#include <TDF_Transaction.hxx>
+#include <TDF_DeltaList.hxx>
+#include <CDM_Document.hxx>
+#include <TDF_LabelMap.hxx>
+#include <TDocStd_FormatVersion.hxx>
+#include <XCAFDoc_DataMapOfShapeLabel.hxx>
+#include <TDataStd_NamedData.hxx>
+#include <TDataStd_GenericEmpty.hxx>
 #include <TDF_LabelSequence.hxx>
-#include <TopTools_MapOfShape.hxx>
+#include <TColStd_SequenceOfHAsciiString.hxx>
+#include <TDF_AttributeSequence.hxx>
 #include <STEPCAFControl_DataMapOfShapePD.hxx>
 #include <STEPCAFControl_DataMapOfPDExternFile.hxx>
-#include <XCAFDoc_DataMapOfShapeLabel.hxx>
 #include <TColStd_HSequenceOfTransient.hxx>
 #include <XCAFDimTolObjects_DatumModifiersSequence.hxx>
 #include <XCAFDimTolObjects_DatumModifWithValue.hxx>
 #include <TDF_LabelNodePtr.hxx>
-#include <XCAFApp_Application.hxx>
-#include <STEPCAFControl_Writer.hxx>
-#include <TDataStd_Name.hxx>
-#include <TDocStd_Document.hxx>
-#include <TopLoc_Location.hxx>
-
-#include<BRepAlgoAPI_Section.hxx>//布尔交的相交线
-#include<BRepAlgoAPI_Common.hxx>//布尔交
-#include<BRepAlgoAPI_Cut.hxx>//布尔减
-#include<BRepAlgoAPI_Fuse.hxx>//布尔加
-
-#include<ProjLib.hxx>
-#include<ElSLib.hxx>
-
-#include<TopAbs_ShapeEnum.hxx>
-
-class Standard_GUID;
-class TDF_Label;
-class TopoDS_Shape;
-class TopLoc_Location;
-class TDF_Attribute;
-class TDF_RelocationTable;
-class XCAFDoc_GraphNode;
-class TDF_Data;
-class TDF_Delta;
-class TDF_Label;
-class TCollection_ExtendedString;
-class TCollection_AsciiString;
-class CDM_Document;
-class TDocStd_CompoundDelta;
-class TDocStd_Document;
-#include <Standard_Integer.hxx>
-#include <Standard_Boolean.hxx>
-#include <Standard_OStream.hxx>
-#include <TDF_AttributeIndexedMap.hxx>
-#include <Standard.hxx>
-#include <Standard_Type.hxx>
-#include <TCollection_ExtendedString.hxx>
-#include <Standard_Integer.hxx>
-#include <TDF_Transaction.hxx>
-#include <TDF_DeltaList.hxx>
-#include <Standard_Boolean.hxx>
-#include <CDM_Document.hxx>
-#include <TDF_LabelMap.hxx>
-//#include <Standard_Address.hxx>
-#include <TDocStd_FormatVersion.hxx>
-#include <XCAFDoc_ShapeTool.hxx>
-#include <XCAFDoc_DataMapOfShapeLabel.hxx>
-#include <Standard_Boolean.hxx>
-#include <TDataStd_NamedData.hxx>
-#include <TDataStd_GenericEmpty.hxx>
-#include <TDF_LabelMap.hxx>
-#include <TDF_LabelSequence.hxx>
-#include <Standard_Integer.hxx>
-#include <Standard_OStream.hxx>
-#include <TColStd_SequenceOfHAsciiString.hxx>
-#include <TDF_AttributeSequence.hxx>
-#include <TopTools_SequenceOfShape.hxx>
-//**
-#include <AIS_ViewCube.hxx>
-//点线
-#include <BRepBuilderAPI_MakeVertex.hxx>
-#include <gce_MakeLin.hxx>
-#include <BRepBuilderAPI_MakeEdge.hxx>
-#include <BRepBuilderAPI_MakeWire.hxx>
-//**
-// 面
-#include <gce_MakePln.hxx>
-#include <BRepBuilderAPI_MakeFace.hxx>
-
-#include <BRepBuilderAPI_MakePolygon.hxx>//线框头文件
-
-// **
-//for stl export
-#include <StlAPI_Writer.hxx>
-//for vrml export
-#include <VrmlAPI_Writer.hxx>
-//wrapper of pure C++ classes to ref classes
-#include <NCollection_Haft.h>
-
-#include <vcclr.h>
-#include <map>//全局映射表  国延林 2026.6.18
+#endif // UNUSED_LEGACY_HEADERS
 static std::map<int, Handle(AIS_InteractiveObject)> GlobalShapeMap;
 
 // list of required OCCT libraries
@@ -869,7 +837,8 @@ public:
     /// </summary>
     /// <param name="theWnd">System.IntPtr that contains the window handle (HWND) of the control</param>
 
-#pragma region OCC初始化函数，初始化视图、颜色、鼠标键盘响应函数，杨宇昂添加，2024.10
+// OLD_REGION: #pragma region OCC初始化函数，初始化视图、颜色、鼠标键盘响应函数，杨宇昂添加，2024.10
+#pragma region 01_Viewer_Initialization_Interaction_And_DisplayQuality
     bool InitViewer(System::IntPtr theWnd)
     {
         try
@@ -907,13 +876,14 @@ public:
         //**
         return true;
     }
-#pragma region 视图一键调整   
+// OLD_REGION: #pragma region 视图一键调整
     /// <summary>
     /// 设置相机的投影方向
     /// </summary>
     /// <param name="dx">X方向向量</param>
     /// <param name="dy">Y方向向量</param>
     /// <param name="dz">Z方向向量</param>
+#if 0 // UNUSED_LEGACY: SetViewDirection
     void SetViewDirection(double dx, double dy, double dz)
     {
         if (myView().IsNull()) return;
@@ -937,11 +907,13 @@ public:
         myView()->ZFitAll(); // 防止 2D 图形在 3D 视角下被切掉
         myView()->Redraw();
     }
+#endif // UNUSED_LEGACY: SetViewDirection
 
     /// <summary>
     /// Make dump of current view to file
     /// </summary>
     /// <param name="theFileName">Name of dump file</param>
+#if 0 // UNUSED_LEGACY: Dump
     bool Dump(const TCollection_AsciiString& theFileName)
     {
         if (myView().IsNull())
@@ -951,6 +923,7 @@ public:
         myView()->Redraw();
         return myView()->Dump(theFileName.ToCString()) != Standard_False;
     }
+#endif // UNUSED_LEGACY: Dump
 
     /// <summary>
     ///Redraw view
@@ -989,6 +962,7 @@ public:
     /// <summary>
     ///Set computed mode in false
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetDegenerateModeOn
     void SetDegenerateModeOn(void)
     {
         if (!myView().IsNull())
@@ -997,10 +971,12 @@ public:
             myView()->Redraw();
         }
     }
+#endif // UNUSED_LEGACY: SetDegenerateModeOn
 
     /// <summary>
     ///Set computed mode in true
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetDegenerateModeOff
     void SetDegenerateModeOff(void)
     {
         if (!myView().IsNull())
@@ -1009,10 +985,12 @@ public:
             myView()->Redraw();
         }
     }
+#endif // UNUSED_LEGACY: SetDegenerateModeOff
 
     /// <summary>
     ///Fit all
     /// </summary>
+#if 0 // UNUSED_LEGACY: WindowFitAll
     void WindowFitAll(int theXmin, int theYmin, int theXmax, int theYmax)
     {
         if (!myView().IsNull())
@@ -1020,11 +998,13 @@ public:
             myView()->WindowFitAll(theXmin, theYmin, theXmax, theYmax);
         }
     }
+#endif // UNUSED_LEGACY: WindowFitAll
 
     /// <summary>
     ///Current place of window
     /// </summary>
     /// <param name="theZoomFactor">Current zoom</param>
+#if 0 // UNUSED_LEGACY: Place
     void Place(int theX, int theY, float theZoomFactor)
     {
         Standard_Real aZoomFactor = theZoomFactor;
@@ -1033,6 +1013,7 @@ public:
             myView()->Place(theX, theY, aZoomFactor);
         }
     }
+#endif // UNUSED_LEGACY: Place
 
     /// <summary>
     ///Set Zoom
@@ -1081,6 +1062,7 @@ public:
     /// <summary>
     ///Select by rectangle
     /// </summary>
+#if 0 // UNUSED_LEGACY: SelectRectangle
     void Select(int theX1, int theY1, int theX2, int theY2)
     {
         if (!myAISContext().IsNull())
@@ -1091,6 +1073,7 @@ public:
             myAISContext()->UpdateCurrentViewer();
         }
     }
+#endif // UNUSED_LEGACY: SelectRectangle
 
     /// <summary>
     ///Select by click
@@ -1118,6 +1101,7 @@ public:
     /// <summary>
     ///Select by rectangle with pressed "Shift" key
     /// </summary>
+#if 0 // UNUSED_LEGACY: ShiftSelectRectangle
     void ShiftSelect(int theX1, int theY1, int theX2, int theY2)
     {
         if ((!myAISContext().IsNull()) && (!myView().IsNull()))
@@ -1129,6 +1113,7 @@ public:
             myAISContext()->UpdateCurrentViewer();
         }
     }
+#endif // UNUSED_LEGACY: ShiftSelectRectangle
 
     /// <summary>
     ///Select by "Shift" key
@@ -1145,6 +1130,7 @@ public:
     /// <summary>
     ///Set background color
     /// </summary>
+#if 0 // UNUSED_LEGACY: BackgroundColor
     void BackgroundColor(int& theRed, int& theGreen, int& theBlue)
     {
         Standard_Real R1;
@@ -1158,36 +1144,43 @@ public:
         theGreen = (int)G1 * 255;
         theBlue = (int)B1 * 255;
     }
+#endif // UNUSED_LEGACY: BackgroundColor
 
     /// <summary>
     ///Get background color Red
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetBGColR
     int GetBGColR(void)
     {
         int aRed, aGreen, aBlue;
         BackgroundColor(aRed, aGreen, aBlue);
         return aRed;
     }
+#endif // UNUSED_LEGACY: GetBGColR
 
     /// <summary>
     ///Get background color Green
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetBGColG
     int GetBGColG(void)
     {
         int aRed, aGreen, aBlue;
         BackgroundColor(aRed, aGreen, aBlue);
         return aGreen;
     }
+#endif // UNUSED_LEGACY: GetBGColG
 
     /// <summary>
     ///Get background color Blue
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetBGColB
     int GetBGColB(void)
     {
         int aRed, aGreen, aBlue;
         BackgroundColor(aRed, aGreen, aBlue);
         return aBlue;
     }
+#endif // UNUSED_LEGACY: GetBGColB
 
     /// <summary>
     ///Update current viewer
@@ -1203,6 +1196,7 @@ public:
     /// <summary>
     ///Front side
     /// </summary>
+#if 0 // UNUSED_LEGACY: FrontView
     void FrontView(void)
     {
         if (!myView().IsNull())
@@ -1210,10 +1204,12 @@ public:
             myView()->SetProj(V3d_Yneg);
         }
     }
+#endif // UNUSED_LEGACY: FrontView
 
     /// <summary>
     ///Top side
     /// </summary>
+#if 0 // UNUSED_LEGACY: TopView
     void TopView(void)
     {
         if (!myView().IsNull())
@@ -1221,10 +1217,12 @@ public:
             myView()->SetProj(V3d_Zpos);
         }
     }
+#endif // UNUSED_LEGACY: TopView
 
     /// <summary>
     ///Left side
     /// </summary>
+#if 0 // UNUSED_LEGACY: LeftView
     void LeftView(void)
     {
         if (!myView().IsNull())
@@ -1232,10 +1230,12 @@ public:
             myView()->SetProj(V3d_Xneg);
         }
     }
+#endif // UNUSED_LEGACY: LeftView
 
     /// <summary>
     ///Back side
     /// </summary>
+#if 0 // UNUSED_LEGACY: BackView
     void BackView(void)
     {
         if (!myView().IsNull())
@@ -1243,10 +1243,12 @@ public:
             myView()->SetProj(V3d_Ypos);
         }
     }
+#endif // UNUSED_LEGACY: BackView
 
     /// <summary>
     ///Right side
     /// </summary>
+#if 0 // UNUSED_LEGACY: RightView
     void RightView(void)
     {
         if (!myView().IsNull())
@@ -1254,10 +1256,12 @@ public:
             myView()->SetProj(V3d_Xpos);
         }
     }
+#endif // UNUSED_LEGACY: RightView
 
     /// <summary>
     ///Bottom side
     /// </summary>
+#if 0 // UNUSED_LEGACY: BottomView
     void BottomView(void)
     {
         if (!myView().IsNull())
@@ -1265,10 +1269,12 @@ public:
             myView()->SetProj(V3d_Zneg);
         }
     }
+#endif // UNUSED_LEGACY: BottomView
 
     /// <summary>
     ///Axo side
     /// </summary>
+#if 0 // UNUSED_LEGACY: AxoView
     void AxoView(void)
     {
         if (!myView().IsNull())
@@ -1276,10 +1282,12 @@ public:
             myView()->SetProj(V3d_XposYnegZpos);
         }
     }
+#endif // UNUSED_LEGACY: AxoView
 
     /// <summary>
     ///Scale
     /// </summary>
+#if 0 // UNUSED_LEGACY: Scale
     float Scale(void)
     {
         if (myView().IsNull())
@@ -1291,6 +1299,7 @@ public:
             return (float)myView()->Scale();
         }
     }
+#endif // UNUSED_LEGACY: Scale
 
     /// <summary>
     ///Zoom in all view
@@ -1319,6 +1328,7 @@ public:
     ///Set display mode of objects
     /// </summary>
     /// <param name="theMode">Set current mode</param>
+#if 0 // UNUSED_LEGACY: SetDisplayMode
     void SetDisplayMode(int theMode)
     {
         if (myAISContext().IsNull())
@@ -1348,10 +1358,12 @@ public:
         }
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: SetDisplayMode
 
     /// <summary>
     ///Set color
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetColor
     void SetColor(int theR, int theG, int theB)
     {
         if (myAISContext().IsNull())
@@ -1366,30 +1378,36 @@ public:
         //myAISContext()->SetColor(myAISContext()->SelectedInteractive(), aCol, Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: SetColor
 
     /// <summary>
     ///Get object color red
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetObjColR
     int GetObjColR(void)
     {
         int aRed, aGreen, aBlue;
         ObjectColor(aRed, aGreen, aBlue);
         return aRed;
     }
+#endif // UNUSED_LEGACY: GetObjColR
 
     /// <summary>
     ///Get object color green
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetObjColG
     int GetObjColG(void)
     {
         int aRed, aGreen, aBlue;
         ObjectColor(aRed, aGreen, aBlue);
         return aGreen;
     }
+#endif // UNUSED_LEGACY: GetObjColG
 
     /// <summary>
     ///Get object color R/G/B
     /// </summary>
+#if 0 // UNUSED_LEGACY: ObjectColor
     void ObjectColor(int& theRed, int& theGreen, int& theBlue)
     {
         if (myAISContext().IsNull())
@@ -1417,20 +1435,24 @@ public:
             theBlue = (int)r3 * 255;
         }
     }
+#endif // UNUSED_LEGACY: ObjectColor
 
     /// <summary>
     ///Get object color blue
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetObjColB
     int GetObjColB(void)
     {
         int aRed, aGreen, aBlue;
         ObjectColor(aRed, aGreen, aBlue);
         return aBlue;
     }
+#endif // UNUSED_LEGACY: GetObjColB
 
     /// <summary>
     ///Set background color R/G/B
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetBackgroundColor
     void SetBackgroundColor(int theRed, int theGreen, int theBlue)
     {
         if (!myView().IsNull())
@@ -1438,10 +1460,12 @@ public:
             myView()->SetBackgroundColor(Quantity_TOC_RGB, theRed / 255., theGreen / 255., theBlue / 255.);
         }
     }
+#endif // UNUSED_LEGACY: SetBackgroundColor
 
     /// <summary>
     ///Erase objects 国延林修改 2026.6
     /// </summary>
+#if 0 // UNUSED_LEGACY: EraseObjects
     void EraseObjects(void)
     {
         if (myAISContext().IsNull()) return;
@@ -1480,18 +1504,22 @@ public:
         // 4. 刷新画面
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: EraseObjects
 
     /// <summary>
     ///Get version
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetOCCVersion
     float GetOCCVersion(void)
     {
         return (float)OCC_VERSION;
     }
+#endif // UNUSED_LEGACY: GetOCCVersion
 
     /// <summary>
     ///set material
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetMaterial
     void SetMaterial(int theMaterial)
     {
         if (myAISContext().IsNull())
@@ -1504,10 +1532,12 @@ public:
         }
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: SetMaterial
 
     /// <summary>
     ///set transparency
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetTransparency
     void SetTransparency(int theTrans)
     {
         if (myAISContext().IsNull())
@@ -1520,10 +1550,12 @@ public:
         }
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: SetTransparency
 
     /// <summary>
     ///Return true if object is selected
     /// </summary>
+#if 0 // UNUSED_LEGACY: IsObjectSelected
     bool IsObjectSelected(void)
     {
         if (myAISContext().IsNull())
@@ -1533,10 +1565,12 @@ public:
         myAISContext()->InitSelected();
         return myAISContext()->MoreSelected() != Standard_False;
     }
+#endif // UNUSED_LEGACY: IsObjectSelected
 
     /// <summary>
     ///Return display mode
     /// </summary>
+#if 0 // UNUSED_LEGACY: DisplayMode
     int DisplayMode(void)
     {
         if (myAISContext().IsNull())
@@ -1572,11 +1606,13 @@ public:
 
         return aMode;
     }
+#endif // UNUSED_LEGACY: DisplayMode
 
     /// <summary>
     ///Create new view
     /// </summary>
     /// <param name="theWnd">System.IntPtr that contains the window handle (HWND) of the control</param>
+#if 0 // UNUSED_LEGACY: CreateNewView
     void CreateNewView(System::IntPtr theWnd)
     {
         if (myAISContext().IsNull())
@@ -1597,10 +1633,12 @@ public:
             aWNTWindow->Map();
         }
     }
+#endif // UNUSED_LEGACY: CreateNewView
 
     /// <summary>
     ///Set AISContext
     /// </summary>
+#if 0 // UNUSED_LEGACY: SetAISContext
     bool SetAISContext(OCCTProxy^ theViewer)
     {
         this->myAISContext() = theViewer->GetContext();
@@ -1610,14 +1648,17 @@ public:
         }
         return true;
     }
+#endif // UNUSED_LEGACY: SetAISContext
 
     /// <summary>
     ///Get AISContext
     /// </summary>
+#if 0 // UNUSED_LEGACY: GetContext
     Handle(AIS_InteractiveContext) GetContext(void)
     {
         return myAISContext();
     }
+#endif // UNUSED_LEGACY: GetContext
     // ============================================================
     // OCC 显示质量增强：全局 Drawer 参数
     // ============================================================
@@ -1844,6 +1885,7 @@ public:
         // 3. 已经显示的对象也重新套一遍高质量参数。
         RefreshAllAISObjectsHighQuality();
     }
+#pragma endregion // 01_Viewer_Initialization_Interaction_And_DisplayQuality
 
 
 
@@ -1857,19 +1899,22 @@ public:
 
 
 
-#pragma endregion
-
+// OLD_REGION: #pragma endregion
 public:
-#pragma region 导入几何文件模型函数，杨宇昂添加，2024.5
+// OLD_REGION: #pragma region 导入几何文件模型函数，杨宇昂添加，2024.5
+#pragma region 90_Disabled_Legacy_Import
+#if 0 // UNUSED_LEGACY: ImportBrepManaged
     bool ImportBrep(System::String^ theFileName)
     {
         return ImportBrep(toAsciiString(theFileName));
     }
+#endif // UNUSED_LEGACY: ImportBrepManaged
 
     /// <summary>
     ///Import BRep file
     /// </summary>
     /// <param name="theFileName">Name of import file</param>
+#if 0 // UNUSED_LEGACY: ImportBrepNative
     bool ImportBrep(const TCollection_AsciiString& theFileName)
     {
         TopoDS_Shape aShape;
@@ -1883,6 +1928,7 @@ public:
         myAISContext()->Display(new AIS_Shape(aShape), Standard_True);
         return true;
     }
+#endif // UNUSED_LEGACY: ImportBrepNative
 
 
     /// <summary>
@@ -1890,6 +1936,7 @@ public:
 /// </summary>
 /// <param name="theFileName">Name of import file</param>
 //void ImportStep(const TCollection_AsciiString& theFileName)
+#if 0 // UNUSED_LEGACY: ImportStep
     array< Double^ >^ ImportStep(System::String^ theFileName)
     {
         const TCollection_AsciiString& theFileName_Asc = toAsciiString(theFileName);
@@ -2077,6 +2124,8 @@ public:
 
         return Point;
     }
+#endif // UNUSED_LEGACY: ImportStep
+#if 0 // UNUSED_LEGACY: ImportStep2
     bool ImportStep2(System::String^ theFileName)//失败
     {
         STEPControl_Reader aReader;
@@ -2107,6 +2156,8 @@ public:
         myAISContext()->UpdateCurrentViewer();
         return true;
     }
+#endif // UNUSED_LEGACY: ImportStep2
+#if 0 // UNUSED_LEGACY: ImportStep3
     bool ImportStep3(System::String^ theFileName)//失败
     {
         STEPControl_Reader aReader;
@@ -2133,6 +2184,8 @@ public:
         myAISContext()->UpdateCurrentViewer();
         return true;
     }
+#endif // UNUSED_LEGACY: ImportStep3
+#if 0 // UNUSED_LEGACY: ImportStep4
     void ImportStep4(System::String^ theFileName)//导入装配和颜色
     {
         //创建文档
@@ -2164,10 +2217,12 @@ public:
             myAISContext()->Display(displayedShape, true);
         }
     }
+#endif // UNUSED_LEGACY: ImportStep4
     /// <summary>
     ///Import Iges file
     /// </summary>
     /// <param name="theFileName">Name of import file</param>
+#if 0 // UNUSED_LEGACY: ImportIges
     bool ImportIges(const TCollection_AsciiString& theFileName)
     {
         IGESControl_Reader aReader;
@@ -2188,13 +2243,16 @@ public:
         myAISContext()->UpdateCurrentViewer();
         return true;
     }
-#pragma endregion
-
-#pragma region 导出几何文件模型函数，杨宇昂，2024.5
+#endif // UNUSED_LEGACY: ImportIges
+#pragma endregion // 90_Disabled_Legacy_Import
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 导出几何文件模型函数，杨宇昂，2024.5
     /// <summary>
     ///Export BRep file
     /// </summary>
     /// <param name="theFileName">Name of export file</param>
+#pragma region 02_STEP_XCAF_Export_And_Disabled_Legacy_Export
+#if 0 // UNUSED_LEGACY: ExportBRep
     bool ExportBRep(const TCollection_AsciiString& theFileName)
     {
         myAISContext()->InitSelected();
@@ -2207,11 +2265,13 @@ public:
         Handle(AIS_Shape) anIS = Handle(AIS_Shape)::DownCast(anIO);
         return BRepTools::Write(anIS->Shape(), theFileName.ToCString()) != Standard_False;
     }
+#endif // UNUSED_LEGACY: ExportBRep
 
     /// <summary>
     ///Export Step file
     /// </summary>
     /// <param name="theFileName">Name of export file</param>
+#if 0 // UNUSED_LEGACY: ExportStep
     bool ExportStep(System::String^ theFileName)
     {
         const TCollection_AsciiString& theFileName_Asc = toAsciiString(theFileName);
@@ -2236,7 +2296,9 @@ public:
         }
         return true;
     }
+#endif // UNUSED_LEGACY: ExportStep
 
+#if 0 // UNUSED_LEGACY: ExportStep2
     bool ExportStep2(System::String^ theFileName)
     {
         AIS_ListOfInteractive displayedObjects;
@@ -2267,6 +2329,7 @@ public:
         }
         return true;
     }
+#endif // UNUSED_LEGACY: ExportStep2
     bool ExportVisibleToSTEP(System::String^ filePath,array<System::String^>^ componentNames,array<array<int>^>^ componentShapeIds)
     {
         if (myAISContext().IsNull()
@@ -2474,6 +2537,7 @@ public:
     ///Export Iges file
     /// </summary>
     /// <param name="theFileName">Name of export file</param>
+#if 0 // UNUSED_LEGACY: ExportIges
     bool ExportIges(const TCollection_AsciiString& theFileName)
     {
         IGESControl_Controller::Init();
@@ -2491,11 +2555,13 @@ public:
         aWriter.ComputeModel();
         return aWriter.Write(theFileName.ToCString()) != Standard_False;
     }
+#endif // UNUSED_LEGACY: ExportIges
 
     /// <summary>
     ///Export Vrml file
     /// </summary>
     /// <param name="theFileName">Name of export file</param>
+#if 0 // UNUSED_LEGACY: ExportVrml
     bool ExportVrml(const TCollection_AsciiString& theFileName)
     {
         TopoDS_Compound aRes;
@@ -2520,11 +2586,13 @@ public:
 
         return true;
     }
+#endif // UNUSED_LEGACY: ExportVrml
 
     /// <summary>
     ///Export Stl file
     /// </summary>
     /// <param name="theFileName">Name of export file</param>
+#if 0 // UNUSED_LEGACY: ExportStl
     bool ExportStl(const TCollection_AsciiString& theFileName)
     {
         TopoDS_Compound aComp;
@@ -2547,11 +2615,14 @@ public:
         aWriter.Write(aComp, theFileName.ToCString());
         return true;
     }
+#endif // UNUSED_LEGACY: ExportStl
+#pragma endregion // 02_STEP_XCAF_Export_And_Disabled_Legacy_Export
 
-#pragma endregion
-
-#pragma region 创建几何文件模型函数，杨宇昂，2024.5
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 创建几何文件模型函数，杨宇昂，2024.5
     //!创建长方体四种方法（已经全部编程完毕）
+#pragma region 91_Disabled_Legacy_Solid_Primitives
+#if 0 // UNUSED_LEGACY: CreateBoxFunction1
     void CreateBoxFunction1(Standard_Real Box_X, Standard_Real Box_Y, Standard_Real Box_Z)
     {
         BRepPrimAPI_MakeBox Box(Box_X, Box_Y, Box_Z);
@@ -2559,7 +2630,9 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateBoxFunction1
     //!长宽高确定一个长方体，中心点在0，0，0，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateBoxFunction2
     void CreateBoxFunction2(Standard_Real Box_Corner_X, Standard_Real Box_Corner_Y, Standard_Real Box_Corner_Z, Standard_Real Box_X, Standard_Real Box_Y, Standard_Real Box_Z)
     {
         BRepPrimAPI_MakeBox Box(gp_Pnt(Box_Corner_X, Box_Corner_Y, Box_Corner_Z), Box_X, Box_Y, Box_Z);
@@ -2567,7 +2640,9 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateBoxFunction2
     //!长宽高确定一个长方体，中心点在Box_Corner_X，Box_Corner_Y，Box_Corner_Z，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateBoxFunction3
     void CreateBoxFunction3(Standard_Real Point1_X, Standard_Real Point1_Y, Standard_Real Point1_Z, Standard_Real Point2_X, Standard_Real Point2_Y, Standard_Real Point2_Z)
     {
         BRepPrimAPI_MakeBox Box(gp_Pnt(Point1_X, Point1_Y, Point1_Z), gp_Pnt(Point2_X, Point2_Y, Point2_Z));
@@ -2575,7 +2650,9 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateBoxFunction3
     //两点确定一个长方体.，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateBoxFunction4
     void CreateBoxFunction4(Standard_Real Box_Corner_X, Standard_Real Box_Corner_Y, Standard_Real Box_Corner_Z, Standard_Real Vertor_X, Standard_Real Vertor_Y, Standard_Real Vertor_Z, Standard_Real Box_X, Standard_Real Box_Y, Standard_Real Box_Z)
     {
         BRepPrimAPI_MakeBox Box(gp_Ax2(gp_Pnt(Box_Corner_X, Box_Corner_Y, Box_Corner_Z), gp_Dir(Vertor_X, Vertor_Y, Vertor_Z)), Box_X, Box_Y, Box_Z);
@@ -2583,10 +2660,12 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateBoxFunction4
     //确定一个点，确定点上的向量，再确定三个边长，杨宇昂添加，2024.6
 
 
      //!创建楔形四种方法（已经全部编程完毕）
+#if 0 // UNUSED_LEGACY: CreateWedgeFunction1
     void CreateWedgeFunction1(const Standard_Real dx, const Standard_Real dy, const Standard_Real dz, const Standard_Real Itx)
     {
         BRepPrimAPI_MakeWedge Wedge(dx, dy, dz, Itx);
@@ -2594,7 +2673,9 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateWedgeFunction1
     //dx  dz确定一个平面（底面），dy是高，Itx是上平面那条dx对应的边，上平面的边是Itx和dz，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateWedgeFunction2
     void CreateWedgeFunction2(const Standard_Real dx, const Standard_Real dy, const Standard_Real dz, const Standard_Real xmin, const Standard_Real zmin, const Standard_Real xmax, const Standard_Real zmax)
     {
         BRepPrimAPI_MakeWedge Wedge(dx, dy, dz, xmin, zmin, xmax, zmax);
@@ -2602,7 +2683,9 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateWedgeFunction2
     //dx dz确定一个平面（底面），dy是高，xmin, zmin, xmax, zmax确定上平面，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateWedgeFunction3
     void CreateWedgeFunction3(const Standard_Real dx, const Standard_Real dy, const Standard_Real dz)
     {
         BRepPrimAPI_MakeWedge Wedge(dx, dy, dz, dx / 2, 0, dx / 2, dz);
@@ -2610,7 +2693,9 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateWedgeFunction3
     //dx dz确定一个平面（底面），dy是高，上表面是dx/2, 0, dx/2, dz确定的一条线，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateWedgeFunction4
     void CreateWedgeFunction4(const Standard_Real dx, const Standard_Real dy, const Standard_Real dz)
     {
         BRepPrimAPI_MakeWedge Wedge(dx, dy, dz, dx / 2, dz / 2, dx / 2, dz / 2);
@@ -2618,10 +2703,12 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateWedgeFunction4
     //dx dz确定一个平面（底面），dy是高，上表面是dx / 2, dz/2, dx / 2, dz/2确定的一个点，杨宇昂添加，2024.6
 
 
      //!创建柱体两种方法（c++四种方法都可以化为这一个方法，其他的都是特例），杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateCylinderFunction1
     void CreateCylinderFunction1(double Center_X, double Center_Y, double Center_Z, double Vector_X, double Vector_Y, double Vector_Z, double r, double h, double angle)
     {
         BRepPrimAPI_MakeCylinder Cylinder(gp_Ax2(gp_Pnt(Center_X, Center_Y, Center_Z), gp_Dir(Vector_X, Vector_Y, Vector_Z)), r, h, angle);
@@ -2629,10 +2716,12 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateCylinderFunction1
     //圆柱的圆心，方向，高度，半径，和旋转角度确定一个圆柱（对应c++方法四），杨宇昂添加，2024.6
 
 
     //!创建圆锥方法（c++四种方法都可以化为这一个方法），杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateConeFunction1
     void CreateConeFunction1(double Center_X, double Center_Y, double Center_Z, double Vector_X, double Vector_Y, double Vector_Z, double R1, double R2, double h, double angle)
     {
         BRepPrimAPI_MakeCone Cone(gp_Ax2(gp_Pnt(Center_X, Center_Y, Center_Z), gp_Dir(Vector_X, Vector_Y, Vector_Z)), R1, R2, h, angle);
@@ -2640,21 +2729,25 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateConeFunction1
     //圆锥的圆心，方向，高度，半径，和旋转角度确定一个圆锥（对应c++方法四），杨宇昂添加，2024.6
 
 
     //!创建球的方法（c++其他方法都可以算作这个方法的特殊情况），杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: CreateSphereFunction1
     void CreateSphereFunction1(double Center_X, double Center_Y, double Center_Z, double r, double angle)
     {
         BRepPrimAPI_MakeSphere Sphere(gp_Pnt(Center_X, Center_Y, Center_Z), r);
         const TopoDS_Shape& shape = Sphere.Shape();
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
-    }//球的球心和半径和角度,angleupward（球体上方有多少角度），angledownward（球体下方有多少角度）确定一个球
+    }
+#endif // UNUSED_LEGACY: CreateSphereFunction1//球的球心和半径和角度,angleupward（球体上方有多少角度），angledownward（球体下方有多少角度）确定一个球
     //球的球心，方向，半径，上球面角度，下球面角度，旋转度数（对应c++最后一个方法），杨宇昂添加，2024.6
 
 
     //!创建圆环的方法（c++其他方法都可以算作这个方法的特殊情况）
+#if 0 // UNUSED_LEGACY: CreateTorusFunction1
     void CreateTorusFunction1(double Center_X, double Center_Y, double Center_Z, double Vector_X, double Vector_Y, double Vector_Z, double R1, double R2)
     {
         BRepPrimAPI_MakeTorus Torus(gp_Ax2(gp_Pnt(Center_X, Center_Y, Center_Z), gp_Dir(Vector_X, Vector_Y, Vector_Z)), R1, R2);
@@ -2662,9 +2755,11 @@ public:
         const TopoDS_Shape& shape = Torus.Shape();
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
-    }//球的球心和半径和角度,angleupward（球体上方有多少角度），angledownward（球体下方有多少角度）确定一个球，杨宇昂添加，2024.6
+    }
+#endif // UNUSED_LEGACY: CreateTorusFunction1//球的球心和半径和角度,angleupward（球体上方有多少角度），angledownward（球体下方有多少角度）确定一个球，杨宇昂添加，2024.6
 
      //圆环的圆环心，方向，圆环左半径，圆环右半径，上圆环角度，下圆环角度，旋转度数（对应c++最后一个方法），杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: MakePrism
     void MakePrism(TopoDS_Shape shape_2d, double Vector_X, double Vector_Y, double Vector_Z)
     {
         BRepPrimAPI_MakePrism shape_Prism(shape_2d, gp_Vec(Vector_X, Vector_Y, Vector_Z));
@@ -2672,18 +2767,23 @@ public:
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: MakePrism
 
+#if 0 // UNUSED_LEGACY: MakeRevol
     void MakeRevol(TopoDS_Shape shape_2d, double Center_X, double Center_Y, double Center_Z, double Vector_X, double Vector_Y, double Vector_Z, double angle)
     {
         BRepPrimAPI_MakeRevol shape_Revol(shape_2d, gp_Ax1(gp_Pnt(Center_X, Center_Y, Center_Z), gp_Dir(Vector_X, Vector_Y, Vector_Z)), angle);
         const TopoDS_Shape& shape = shape_Revol.Shape();
         myAISContext()->Display(new AIS_Shape(shape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
-    }//暂时未完成
+    }
+#endif // UNUSED_LEGACY: MakeRevol//暂时未完成
+#pragma endregion // 91_Disabled_Legacy_Solid_Primitives
 
-#pragma endregion
-
-#pragma region 创建点线面，杨宇昂添加，2024.4
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 创建点线面，杨宇昂添加，2024.4
+#pragma region 03_Basic_Geometry_And_Disabled_Legacy_Drawing
+#if 0 // UNUSED_LEGACY: CreatePoint
     void CreatePoint(double Center_X, double Center_Y, double Center_Z)
     {
         //创建点并显示
@@ -2694,6 +2794,7 @@ public:
         myAISContext()->Display(aisShape, Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreatePoint
 
     //线创建函数改造 国延林 2026.6.18
     void CreateLine(int id, double X1, double X2, double Y1, double Y2, double Z1, double Z2)
@@ -2710,6 +2811,7 @@ public:
         myAISContext()->Display(aisShape, Standard_False);
     }
 
+#if 0 // UNUSED_LEGACY: CreateSurface
     void CreateSurface(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double U1, double V1, double U2, double V2)
     {
         //创建点并显示
@@ -2723,13 +2825,15 @@ public:
         myAISContext()->Display(aisShape, Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
-#pragma endregion
-
+#endif // UNUSED_LEGACY: CreateSurface
+// OLD_REGION: #pragma endregion
     //显示坐标轴，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: Show3dAxo
     void Show3dAxo()
     {
         myView()->TriedronDisplay(Aspect_TOTP_LEFT_LOWER, Quantity_NOC_WHITE, 0.2, V3d_ZBUFFER);
     }
+#endif // UNUSED_LEGACY: Show3dAxo
 
     //初始化OCC，杨宇昂添加，2024.6
     void InitOCCTProxy(void)
@@ -2740,7 +2844,8 @@ public:
         myAISContext() = NULL;
     }
 
-#pragma region 判断是直线还是圆弧，杨宇昂添加，2024.6
+// OLD_REGION: #pragma region 判断是直线还是圆弧，杨宇昂添加，2024.6
+#if 0 // UNUSED_LEGACY: JudgeTopoEdgeType
     int JudgeTopoEdgeType(const TopoDS_Edge& TopoEdge)
     {
         double first = 0.0;
@@ -2765,8 +2870,9 @@ public:
         }
         return flag;
     }
-#pragma endregion
-
+#endif // UNUSED_LEGACY: JudgeTopoEdgeType
+// OLD_REGION: #pragma endregion
+#if 0 // UNUSED_LEGACY: InterGetCoordinate
     void InterGetCoordinate(int x, int y)//获取鼠标所在位置的坐标，有问题
     {
         Standard_Real X, Y, Z;
@@ -2777,8 +2883,10 @@ public:
         gp_Pnt ResultPoint = ElSLib::Value(ConvertedPointOnPlane.X(), ConvertedPointOnPlane.Y(), plane);
         double realX = ResultPoint.X();
     }
+#endif // UNUSED_LEGACY: InterGetCoordinate
 
-#pragma region //点击两个点创建一条直线，杨宇昂添加，2025.4
+// OLD_REGION: #pragma region //点击两个点创建一条直线，杨宇昂添加，2025.4
+#if 0 // UNUSED_LEGACY: InterCreateLine
     void InterCreateLine()
     {
         gp_Pnt point_1;
@@ -2816,9 +2924,10 @@ public:
         myAISContext()->Display(aisShape, Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
-#pragma endregion
-
-#pragma region 布尔操作函数，杨宇昂添加，2025.4
+#endif // UNUSED_LEGACY: InterCreateLine
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 布尔操作函数，杨宇昂添加，2025.4
+#if 0 // UNUSED_LEGACY: AlgoAPI_Cut
     void AlgoAPI_Cut()
     {
         myAISContext()->InitSelected();
@@ -2833,7 +2942,9 @@ public:
         myAISContext()->Display(new AIS_Shape(ShapeCut), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: AlgoAPI_Cut
 
+#if 0 // UNUSED_LEGACY: AlgoAPI_Jia
     void AlgoAPI_Jia()
     {
         myAISContext()->InitSelected();
@@ -2848,7 +2959,9 @@ public:
         myAISContext()->Display(new AIS_Shape(ShapeCut), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: AlgoAPI_Jia
 
+#if 0 // UNUSED_LEGACY: AlgoAPI_Jiao
     void AlgoAPI_Jiao()
     {
         myAISContext()->InitSelected();
@@ -2863,7 +2976,9 @@ public:
         myAISContext()->Display(new AIS_Shape(ShapeCut), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: AlgoAPI_Jiao
 
+#if 0 // UNUSED_LEGACY: boolerFuse
     void boolerFuse()
     {
         Handle(AIS_InteractiveObject) anIO1 = myAISContext()->SelectedInteractive();
@@ -2878,9 +2993,10 @@ public:
         myAISContext()->Erase(anIS1, Standard_True);
         myAISContext()->Erase(anIS2, Standard_True);
     }
-#pragma endregion
-
-#pragma region 创建三角形函数，杨宇昂添加，2025.4
+#endif // UNUSED_LEGACY: boolerFuse
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 创建三角形函数，杨宇昂添加，2025.4
+#if 0 // UNUSED_LEGACY: CreateTriangleXOY
     void CreateTriangleXOY(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -2901,7 +3017,9 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateTriangleXOY
 
+#if 0 // UNUSED_LEGACY: CreateTriangleYOZ
     void CreateTriangleYOZ(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -2922,7 +3040,9 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateTriangleYOZ
 
+#if 0 // UNUSED_LEGACY: CreateTriangleZOX
     void CreateTriangleZOX(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -2943,9 +3063,10 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
-#pragma endregion
-
-#pragma region 创建四边形函数，杨宇昂添加，2025.4
+#endif // UNUSED_LEGACY: CreateTriangleZOX
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 创建四边形函数，杨宇昂添加，2025.4
+#if 0 // UNUSED_LEGACY: CreateQuadXOY
     void CreateQuadXOY(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double X4, double Y4, double Z4)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -2968,7 +3089,9 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateQuadXOY
 
+#if 0 // UNUSED_LEGACY: CreateQuadYOZ
     void CreateQuadYOZ(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double X4, double Y4, double Z4)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -2991,7 +3114,9 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateQuadYOZ
 
+#if 0 // UNUSED_LEGACY: CreateQuadZOX
     void CreateQuadZOX(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double X4, double Y4, double Z4)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -3014,9 +3139,10 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
-#pragma endregion
-
-#pragma region 创建T形函数，杨宇昂添加，2025.4
+#endif // UNUSED_LEGACY: CreateQuadZOX
+// OLD_REGION: #pragma endregion
+// OLD_REGION: #pragma region 创建T形函数，杨宇昂添加，2025.4
+#if 0 // UNUSED_LEGACY: CreateXOZTShape
     void CreateXOZTShape(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double X4, double Y4, double Z4, double X5, double Y5, double Z5, double X6, double Y6, double Z6, double X7, double Y7, double Z7, double X8, double Y8, double Z8)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -3047,7 +3173,9 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateXOZTShape
 
+#if 0 // UNUSED_LEGACY: CreateXOYTShape
     void CreateXOYTShape(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double X4, double Y4, double Z4, double X5, double Y5, double Z5, double X6, double Y6, double Z6, double X7, double Y7, double Z7, double X8, double Y8, double Z8)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -3078,6 +3206,7 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateXOYTShape
     //创建圆弧函数，对接DXF解析与交互绘图， 国延林，2026.06 
     void CreateArcByCenter(int id, double cx, double cy, double cz, double radius, double startAngle, double endAngle)
     {
@@ -3102,6 +3231,7 @@ public:
         }
     }
     //根据【起点、中点、终点】三点创建几何圆弧（用于手动交互绘图）
+#if 0 // UNUSED_LEGACY: CreateArcBy3Points
     void CreateArcBy3Points(double x1, double y1, double z1,
         double x2, double y2, double z2,
         double x3, double y3, double z3)
@@ -3120,6 +3250,8 @@ public:
             myAISContext()->UpdateCurrentViewer();
         }
     }
+#endif // UNUSED_LEGACY: CreateArcBy3Points
+#if 0 // UNUSED_LEGACY: CreateYOZTShape
     void CreateYOZTShape(double X1, double Y1, double Z1, double X2, double Y2, double Z2, double X3, double Y3, double Z3, double X4, double Y4, double Z4, double X5, double Y5, double Z5, double X6, double Y6, double Z6, double X7, double Y7, double Z7, double X8, double Y8, double Z8)
     {
         gp_Pnt A(X1, Y1, Z1); // 左下
@@ -3150,9 +3282,12 @@ public:
         myAISContext()->Display(new AIS_Shape(myShape), Standard_False);
         myAISContext()->UpdateCurrentViewer();
     }
+#endif // UNUSED_LEGACY: CreateYOZTShape
+#pragma endregion // 03_Basic_Geometry_And_Disabled_Legacy_Drawing
     /// <summary>
     /// 根据 ID 隐藏或显示指定的图元
     /// </summary>
+#pragma region 04_Object_Visibility_And_Lifecycle
     void SetShapeVisibility(int id, bool isVisible)
     {
         if (myAISContext().IsNull()) return;
@@ -3195,10 +3330,12 @@ public:
             myAISContext()->UpdateCurrentViewer();         // 强制刷新画面，让高亮立刻消失
         }
     }
+#pragma endregion // 04_Object_Visibility_And_Lifecycle
 
 
 
     //线条自动连接（帘线专用）
+#pragma region 05_Line_Combine_Split_And_Delete
     array<int>^ AutoCombineLines(int startId, int newId)
     {
         if (myAISContext().IsNull() || GlobalShapeMap.find(startId) == GlobalShapeMap.end()) 
@@ -3788,6 +3925,7 @@ public:
 
         return true;
     }
+#pragma endregion // 05_Line_Combine_Split_And_Delete
 
 
 
@@ -3795,6 +3933,7 @@ public:
     /// <summary>
     /// 核心制面引擎：将传入的多个线段 ID 缝合并生成实心面
     /// </summary>
+#pragma region 06_Face_Polyline_Cord_And_Selection
     bool CreateFaceFromLines(
         array<int>^ lineIds,
         int newFaceId,
@@ -4745,14 +4884,14 @@ public:
             myAISContext()->AddOrRemoveSelected(GlobalShapeMap[id], Standard_False);
         }
     }
+#pragma endregion // 06_Face_Polyline_Cord_And_Selection
 
 
 
 
 
 
-#pragma endregion
-
+// OLD_REGION: #pragma endregion
 private:
     // fields
     NCollection_Haft<Handle(V3d_Viewer)> myViewer;
