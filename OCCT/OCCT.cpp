@@ -12,6 +12,7 @@
 #include <ShapeAnalysis_FreeBounds.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <TopTools_ListOfShape.hxx>
+#include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopTools_HSequenceOfShape.hxx>
 #include <Prs3d_LineAspect.hxx>
 #include <Graphic3d_NameOfMaterial.hxx>
@@ -24,6 +25,10 @@
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <TColgp_HArray1OfPnt.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <GeomAbs_CurveType.hxx>
+#include <Extrema_ExtElC.hxx>
+#include <Extrema_POnCurv.hxx>
+#include <Precision.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <TColgp_HSequenceOfPnt.hxx>
 #include <Prs3d_Drawer.hxx>
@@ -33,6 +38,8 @@
 #include <AIS_ListIteratorOfListOfInteractive.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <set>
+#include <algorithm>
+#include <limits>
 
 
 
@@ -267,6 +274,177 @@ static bool AreEdgesTouching(const TopoDS_Shape& shape1, const TopoDS_Shape& sha
     }
     return false;
 }
+struct SnapSplitPlan
+{
+    std::vector<TopoDS_Edge> TargetEdges;
+    TopoDS_Edge SnappedToolEdge;
+    Standard_Real Gap;
+};
+
+static bool GetOnlyEdge(const TopoDS_Shape& shape, TopoDS_Edge& edge)
+{
+    TopExp_Explorer explorer(shape, TopAbs_EDGE);
+    if (!explorer.More())
+        return false;
+
+    edge = TopoDS::Edge(explorer.Current());
+    explorer.Next();
+    return !explorer.More() && !edge.IsNull();
+}
+static bool BuildSnapSplitPlan(
+    const TopoDS_Shape& targetShape,
+    const TopoDS_Shape& toolShape,
+    const Standard_Real tolerance,
+    SnapSplitPlan& plan)
+{
+    if (tolerance <= Precision::Confusion())
+        return false;
+
+    TopoDS_Edge toolEdge;
+    if (!GetOnlyEdge(toolShape, toolEdge))
+        return false;
+
+    BRepAdaptor_Curve toolAdaptor(toolEdge);
+    if (toolAdaptor.GetType() != GeomAbs_Line)
+        return false;
+
+    Standard_Real toolFirst = 0.0;
+    Standard_Real toolLast = 0.0;
+    Handle(Geom_Curve) toolCurve = BRep_Tool::Curve(toolEdge, toolFirst, toolLast);
+    if (toolCurve.IsNull())
+        return false;
+
+    const gp_Pnt toolStart = toolCurve->Value(toolFirst);
+    const gp_Pnt toolEnd = toolCurve->Value(toolLast);
+    const Standard_Real minPieceLength =
+        std::max(tolerance * 0.1, Precision::Confusion() * 100.0);
+    const Standard_Real supportDistanceTolerance =
+        std::max(tolerance * 0.01, Precision::Confusion() * 100.0);
+    const Standard_Real minAngle = 3.0 * 3.14159265358979323846 / 180.0;
+
+    Standard_Real bestGap = std::numeric_limits<Standard_Real>::max();
+    TopoDS_Edge bestTargetEdge;
+    gp_Pnt bestSnapPoint;
+    bool snapToolStart = false;
+
+    try
+    {
+        for (TopExp_Explorer explorer(targetShape, TopAbs_EDGE);
+            explorer.More(); explorer.Next())
+        {
+            const TopoDS_Edge targetEdge = TopoDS::Edge(explorer.Current());
+            BRepAdaptor_Curve targetAdaptor(targetEdge);
+            if (targetAdaptor.GetType() != GeomAbs_Line)
+                continue;
+
+            const Standard_Real angle =
+                targetAdaptor.Line().Direction().Angle(toolAdaptor.Line().Direction());
+            const Standard_Real acuteAngle = std::min(angle, 3.14159265358979323846 - angle);
+            if (acuteAngle < minAngle)
+                continue;
+
+            Extrema_ExtElC extrema(
+                targetAdaptor.Line(), toolAdaptor.Line(), Precision::Angular());
+            if (!extrema.IsDone() || extrema.IsParallel() || extrema.NbExt() < 1)
+                continue;
+
+            for (Standard_Integer i = 1; i <= extrema.NbExt(); ++i)
+            {
+                if (extrema.SquareDistance(i) >
+                    supportDistanceTolerance * supportDistanceTolerance)
+                    continue;
+
+                Extrema_POnCurv targetPointOnCurve;
+                Extrema_POnCurv toolPointOnCurve;
+                extrema.Points(i, targetPointOnCurve, toolPointOnCurve);
+
+                Standard_Real targetFirst = 0.0;
+                Standard_Real targetLast = 0.0;
+                Handle(Geom_Curve) targetCurve =
+                    BRep_Tool::Curve(targetEdge, targetFirst, targetLast);
+                if (targetCurve.IsNull())
+                    continue;
+
+                GeomAPI_ProjectPointOnCurve projector(
+                    targetPointOnCurve.Value(), targetCurve, targetFirst, targetLast);
+                if (projector.NbPoints() < 1)
+                    continue;
+
+                const gp_Pnt snapPoint = projector.NearestPoint();
+                if (snapPoint.Distance(targetPointOnCurve.Value()) > supportDistanceTolerance)
+                    continue;
+
+                const gp_Pnt targetStart = targetCurve->Value(targetFirst);
+                const gp_Pnt targetEnd = targetCurve->Value(targetLast);
+                if (targetStart.Distance(snapPoint) <= minPieceLength ||
+                    targetEnd.Distance(snapPoint) <= minPieceLength)
+                    continue;
+
+                const Standard_Real startGap = toolStart.Distance(snapPoint);
+                const Standard_Real endGap = toolEnd.Distance(snapPoint);
+                const bool useStart = startGap <= endGap;
+                const Standard_Real gap = useStart ? startGap : endGap;
+
+                if (gap > tolerance || gap >= bestGap)
+                    continue;
+
+                const gp_Pnt fixedToolEnd = useStart ? toolEnd : toolStart;
+                if (fixedToolEnd.Distance(snapPoint) <= minPieceLength)
+                    continue;
+
+                bestGap = gap;
+                bestTargetEdge = targetEdge;
+                bestSnapPoint = snapPoint;
+                snapToolStart = useStart;
+            }
+        }
+
+        if (bestTargetEdge.IsNull())
+            return false;
+
+        plan.TargetEdges.clear();
+        for (TopExp_Explorer explorer(targetShape, TopAbs_EDGE);
+            explorer.More(); explorer.Next())
+        {
+            const TopoDS_Edge targetEdge = TopoDS::Edge(explorer.Current());
+            if (!targetEdge.IsSame(bestTargetEdge))
+            {
+                plan.TargetEdges.push_back(targetEdge);
+                continue;
+            }
+
+            Standard_Real targetFirst = 0.0;
+            Standard_Real targetLast = 0.0;
+            Handle(Geom_Curve) targetCurve =
+                BRep_Tool::Curve(targetEdge, targetFirst, targetLast);
+            if (targetCurve.IsNull())
+                return false;
+
+            BRepBuilderAPI_MakeEdge firstPart(targetCurve->Value(targetFirst), bestSnapPoint);
+            BRepBuilderAPI_MakeEdge secondPart(bestSnapPoint, targetCurve->Value(targetLast));
+            if (!firstPart.IsDone() || !secondPart.IsDone())
+                return false;
+
+            plan.TargetEdges.push_back(firstPart.Edge());
+            plan.TargetEdges.push_back(secondPart.Edge());
+        }
+
+        BRepBuilderAPI_MakeEdge snappedToolMaker(
+            snapToolStart ? bestSnapPoint : toolStart,
+            snapToolStart ? toolEnd : bestSnapPoint);
+        if (!snappedToolMaker.IsDone())
+            return false;
+
+        plan.SnappedToolEdge = snappedToolMaker.Edge();
+        plan.Gap = bestGap;
+        return plan.TargetEdges.size() >= 2 && !plan.SnappedToolEdge.IsNull();
+    }
+    catch (const Standard_Failure&)
+    {
+        return false;
+    }
+}
+
 //! Auxiliary tool for converting C# string into UTF-8 string.
 static TCollection_AsciiString toAsciiString(String^ theString)
 {
@@ -3438,81 +3616,152 @@ public:
     /// <param name="toolId">作为切刀的相交线 (Tool)</param>
     /// <param name="startingNewId">由 C# 传入的可用起始 ID</param>
     /// <returns>返回打断后生成的所有新散线 ID 数组。如果没相交/失败，返回 nullptr</returns>
-    array<int>^ SplitLine(int targetId, int toolId, int startingNewId)
+    array<int>^ SplitLine(
+        int targetId,
+        int toolId,
+        int startingNewId,
+        double geometryTolerance)
     {
-        if (myAISContext().IsNull()) return nullptr;
-
-        // 1. 验证目标和工具都在档案室中
-        if (GlobalShapeMap.find(targetId) == GlobalShapeMap.end() ||
-            GlobalShapeMap.find(toolId) == GlobalShapeMap.end()) {
+        if (myAISContext().IsNull() || targetId == toolId ||
+            geometryTolerance <= Precision::Confusion())
             return nullptr;
-        }
 
-        TopoDS_Shape targetShape = Handle(AIS_Shape)::DownCast(GlobalShapeMap[targetId])->Shape();
-        TopoDS_Shape toolShape = Handle(AIS_Shape)::DownCast(GlobalShapeMap[toolId])->Shape();
+        const auto targetIterator = GlobalShapeMap.find(targetId);
+        const auto toolIterator = GlobalShapeMap.find(toolId);
+        if (targetIterator == GlobalShapeMap.end() ||
+            toolIterator == GlobalShapeMap.end())
+            return nullptr;
 
-        // 2. 【核心黑科技】：使用布尔切断器
-        TopTools_ListOfShape argsList;
-        argsList.Append(targetShape); // 把被切的目标放进“肉盘子”
+        Handle(AIS_Shape) targetAis =
+            Handle(AIS_Shape)::DownCast(targetIterator->second);
+        Handle(AIS_Shape) toolAis =
+            Handle(AIS_Shape)::DownCast(toolIterator->second);
+        if (targetAis.IsNull() || toolAis.IsNull())
+            return nullptr;
 
-        TopTools_ListOfShape toolsList;
-        toolsList.Append(toolShape);  // 把相交的线放进“刀盘子”
+        const TopoDS_Shape targetShape = targetAis->Shape();
+        const TopoDS_Shape toolShape = toolAis->Shape();
+        if (targetShape.IsNull() || toolShape.IsNull())
+            return nullptr;
 
-        BRepAlgoAPI_Splitter splitter;
-        splitter.SetArguments(argsList); // 设置目标列表
-        splitter.SetTools(toolsList);    // 设置切刀列表
-
-        // ==============================================================
-        // 【核心改造】：开启“模糊布尔运算 (Fuzzy Boolean Operation)”
-        // 这里的 1e-2 (即 0.01) 表示容差值，单位通常是毫米。
-        // 这意味着：只要刀和目标线之间的距离小于 0.01mm，引擎就会强行认为它们相交！
-        // ==============================================================
-        splitter.SetFuzzyValue(1e-2);
-
-        splitter.Build();                // 发动引擎执行切割！
-
-        // 如果底层数学引擎判断它们空间不相交，直接返回失败
-        if (!splitter.IsDone()) return nullptr;
-
-        TopoDS_Shape resultShape = splitter.Shape();
-
-        // 3. 清点切断后的线段数量
-        std::vector<TopoDS_Edge> splitEdges;
-        for (TopExp_Explorer ex(resultShape, TopAbs_EDGE); ex.More(); ex.Next()) {
-            splitEdges.push_back(TopoDS::Edge(ex.Current()));
-        }
-
-        // 统计一下原来被切之前有几条边
+        std::vector<TopoDS_Edge> targetEdges;
         int originalEdgeCount = 0;
-        for (TopExp_Explorer ex(targetShape, TopAbs_EDGE); ex.More(); ex.Next()) originalEdgeCount++;
+        bool usedEndpointSnap = false;
+        SnapSplitPlan snapPlan;
+        try
+        {
+            TopTools_ListOfShape arguments;
+            arguments.Append(targetShape);
+            TopTools_ListOfShape tools;
+            tools.Append(toolShape);
 
-        // 如果切完之后的数量 <= 切之前的数量，说明“刀”没砍中（即便加了容差也没相交）
-        if (splitEdges.size() <= originalEdgeCount) return nullptr;
+            BRepAlgoAPI_Splitter splitter;
+            splitter.SetArguments(arguments);
+            splitter.SetTools(tools);
+            splitter.Build();
 
-        // 4. 真正打断成功了！开始交接后事
-        array<int>^ newIds = gcnew array<int>(splitEdges.size());
+            if (splitter.IsDone())
+            {
+                for (TopExp_Explorer explorer(targetShape, TopAbs_EDGE);
+                    explorer.More(); explorer.Next())
+                {
+                    ++originalEdgeCount;
+                    const TopoDS_Edge originalEdge = TopoDS::Edge(explorer.Current());
+                    const TopTools_ListOfShape& modified = splitter.Modified(originalEdge);
 
-        // 从视口和档案室抹除旧的“整线” (注意：切刀 toolShape 保持原样不动)
-        myAISContext()->Remove(GlobalShapeMap[targetId], Standard_False);
-        GlobalShapeMap.erase(targetId);
+                    if (modified.IsEmpty())
+                    {
+                        targetEdges.push_back(originalEdge);
+                        continue;
+                    }
 
-        // 5. 将切碎的线段重新登记并显示
-        int currentId = startingNewId;
-        for (size_t i = 0; i < splitEdges.size(); i++) {
-            Handle(AIS_Shape) newAis = new AIS_Shape(splitEdges[i]);
-            // 为了给用户强烈的视觉反馈，把打断后新生成的线高亮为红色
+                    for (TopTools_ListIteratorOfListOfShape item(modified);
+                        item.More(); item.Next())
+                    {
+                        for (TopExp_Explorer edgeExplorer(item.Value(), TopAbs_EDGE);
+                            edgeExplorer.More(); edgeExplorer.Next())
+                        {
+                            targetEdges.push_back(TopoDS::Edge(edgeExplorer.Current()));
+                        }
+                    }
+                }
+            }
+        }
+        catch (const Standard_Failure&)
+        {
+            targetEdges.clear();
+        }
+        if (originalEdgeCount == 0 ||
+            targetEdges.size() <= static_cast<std::size_t>(originalEdgeCount))
+        {
+            targetEdges.clear();
+            if (!BuildSnapSplitPlan(
+                targetShape, toolShape,
+                static_cast<Standard_Real>(geometryTolerance), snapPlan))
+                return nullptr;
+
+            targetEdges = snapPlan.TargetEdges;
+            usedEndpointSnap = true;
+        }
+
+        if (targetEdges.empty())
+            return nullptr;
+        std::vector<Handle(AIS_Shape)> newTargetObjects;
+        newTargetObjects.reserve(targetEdges.size());
+        for (std::size_t i = 0; i < targetEdges.size(); ++i)
+        {
+            const int newId = startingNewId + static_cast<int>(i);
+            if (GlobalShapeMap.find(newId) != GlobalShapeMap.end())
+                return nullptr;
+
+            Handle(AIS_Shape) newAis = new AIS_Shape(targetEdges[i]);
+            if (newAis.IsNull())
+                return nullptr;
             newAis->SetColor(Quantity_NOC_RED);
+            if (targetAis->HasWidth())
+                newAis->SetWidth(targetAis->Width());
+            newTargetObjects.push_back(newAis);
+        }
 
-            GlobalShapeMap[currentId] = newAis;
-            myAISContext()->Display(newAis, Standard_False);
+        Handle(AIS_Shape) snappedToolAis;
+        if (usedEndpointSnap)
+        {
+            snappedToolAis = new AIS_Shape(snapPlan.SnappedToolEdge);
+            if (snappedToolAis.IsNull())
+                return nullptr;
 
-            newIds[i] = currentId;
-            currentId++; // 消耗 ID
+            if (toolAis->HasColor())
+            {
+                Quantity_Color toolColor;
+                toolAis->Color(toolColor);
+                snappedToolAis->SetColor(toolColor);
+            }
+            if (toolAis->HasWidth())
+                snappedToolAis->SetWidth(toolAis->Width());
+        }
+
+        array<int>^ newIds =
+            gcnew array<int>(static_cast<int>(targetEdges.size()));
+
+        myAISContext()->Remove(targetIterator->second, Standard_False);
+        GlobalShapeMap.erase(targetId);
+        if (usedEndpointSnap)
+        {
+            myAISContext()->Remove(toolIterator->second, Standard_False);
+            GlobalShapeMap[toolId] = snappedToolAis;
+            myAISContext()->Display(snappedToolAis, Standard_False);
+        }
+
+        for (std::size_t i = 0; i < newTargetObjects.size(); ++i)
+        {
+            const int newId = startingNewId + static_cast<int>(i);
+            GlobalShapeMap[newId] = newTargetObjects[i];
+            myAISContext()->Display(newTargetObjects[i], Standard_False);
+            newIds[static_cast<int>(i)] = newId;
         }
 
         myAISContext()->ClearSelected(Standard_False);
         myAISContext()->UpdateCurrentViewer();
-
         return newIds;
     }
     /// <summary>
@@ -3546,9 +3795,17 @@ public:
     /// <summary>
     /// 核心制面引擎：将传入的多个线段 ID 缝合并生成实心面
     /// </summary>
-    bool CreateFaceFromLines(array<int>^ lineIds, int newFaceId, int r, int g, int b) // 【新增】RGB 参数
+    bool CreateFaceFromLines(
+        array<int>^ lineIds,
+        int newFaceId,
+        int r,
+        int g,
+        int b,
+        double geometryTolerance)
     {
-        if (myAISContext().IsNull() || lineIds->Length == 0) return false;
+        if (myAISContext().IsNull() || lineIds->Length == 0 ||
+            geometryTolerance <= Precision::Confusion())
+            return false;
 
         // 1. 收集所有的 Edge
         Handle(TopTools_HSequenceOfShape) edgesSeq = new TopTools_HSequenceOfShape();
@@ -3564,7 +3821,11 @@ public:
 
         // 2. 强行连线 (容差 0.01mm)，拼出多个闭合线圈(Wire)
         Handle(TopTools_HSequenceOfShape) wiresSeq = new TopTools_HSequenceOfShape();
-        ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edgesSeq, 1e-2, Standard_False, wiresSeq);
+        ShapeAnalysis_FreeBounds::ConnectEdgesToWires(
+            edgesSeq,
+            static_cast<Standard_Real>(geometryTolerance),
+            Standard_False,
+            wiresSeq);
 
         if (wiresSeq->Length() == 0) return false;
 

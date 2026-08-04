@@ -29,6 +29,9 @@ namespace UI
         private int componentCounter = 1;        // 记录 Component 的数量
         private TreeNode currentComponentNode = null; 
 
+        // 几何处理统一容差（当前模型单位为 mm）：线端点吸附、线打断和制面共用。
+        private double geometryTolerance = 0.01;
+
         // 模拟 HyperMesh 的高对比度经典色板
         private Color[] hmColorPalette = new Color[] 
         {
@@ -485,7 +488,10 @@ namespace UI
             Color compColor = currentComponentNode.ForeColor;
 
             // 4. 呼叫 C++ 底层发功，带上 RGB 颜色值
-            bool success = myOCCTProxy.CreateFaceFromLines(selectedLinesForFace.ToArray(), newFaceId, compColor.R, compColor.G, compColor.B);
+            bool success = myOCCTProxy.CreateFaceFromLines(
+                selectedLinesForFace.ToArray(), newFaceId,
+                compColor.R, compColor.G, compColor.B,
+                geometryTolerance);
 
             if (success)
             {

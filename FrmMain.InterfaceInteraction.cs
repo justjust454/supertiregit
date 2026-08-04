@@ -272,20 +272,21 @@ namespace UI
                                 }
 
                                 // 触发打断指令
-                                int[] newIds = myOCCTProxy.SplitLine(targetId, toolId, globalShapeId);
+                                int[] newIds = myOCCTProxy.SplitLine(
+                                    targetId, toolId, globalShapeId, geometryTolerance);
 
                                 if (newIds != null && newIds.Length > 0)
                                 {
                                     // 成功了，扣除消耗掉的 ID 份额
                                     globalShapeId += newIds.Length;
-                                    LogMessage($"原线条被切分为 {newIds.Length} 段。");
+                                    LogMessage($"原线条被切分为 {newIds.Length} 段（容差 {geometryTolerance:0.####} mm）。");
 
                                     // 更新树状图
                                     UpdateTreeAfterSplit(targetId, newIds);
                                 }
                                 else
                                 {
-                                    LogMessage("打断失败：两根线条在空间中并没有真实的物理交点！");
+                                    LogMessage($"打断失败：没有真实交点，且切刀端点距理论交点超过 {geometryTolerance:0.####} mm。");
                                 }
 
                                 // 无论成功还是失败，清空队列，准备下一轮打断

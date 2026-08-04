@@ -64,9 +64,9 @@ Class OCCTProxy: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
     ClearSelected(): PrivateScope, Public, HideBySig
     AutoCombineLines(Int32, Int32): PrivateScope, Public, HideBySig
     CombineLines(Int32, Int32, Int32): PrivateScope, Public, HideBySig
-    SplitLine(Int32, Int32, Int32): PrivateScope, Public, HideBySig
+    SplitLine(Int32, Int32, Int32, Double): PrivateScope, Public, HideBySig
     DeleteLine(Int32): PrivateScope, Public, HideBySig
-    CreateFaceFromLines(Int32[], Int32, Int32, Int32, Int32): PrivateScope, Public, HideBySig
+    CreateFaceFromLines(Int32[], Int32, Int32, Int32, Int32, Double): PrivateScope, Public, HideBySig
     CreatePolyline(Int32, Double[], Boolean(HasFieldMarshal)): PrivateScope, Public, HideBySig
     CreateCordFromTwoCurves(Int32, Int32, Int32): PrivateScope, Public, HideBySig
     GetSelectedIds(): PrivateScope, Public, HideBySig
