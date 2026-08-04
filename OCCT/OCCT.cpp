@@ -131,6 +131,10 @@
 #include <XCAFDimTolObjects_DatumModifWithValue.hxx>
 #include <TDF_LabelNodePtr.hxx>
 #include <XCAFApp_Application.hxx>
+#include <STEPCAFControl_Writer.hxx>
+#include <TDataStd_Name.hxx>
+#include <TDocStd_Document.hxx>
+#include <TopLoc_Location.hxx>
 
 #include<BRepAlgoAPI_Section.hxx>//布尔交的相交线
 #include<BRepAlgoAPI_Common.hxx>//布尔交
@@ -242,6 +246,13 @@ static std::map<int, Handle(AIS_InteractiveObject)> GlobalShapeMap;
 #pragma comment(lib, "TKG2d.lib")//检索边所需要的静态链接库
 #pragma comment(lib, "TKG3d.lib")//检索边所需要的静态链接库
 #pragma comment(lib, "TKMesh.lib")
+#pragma comment(lib, "TKXCAF.lib")
+#pragma comment(lib, "TKXDESTEP.lib")
+
+#pragma comment(lib, "TKSTEP.lib")
+#pragma comment(lib, "TKSTEPBase.lib")
+#pragma comment(lib, "TKSTEPAttr.lib")
+#pragma comment(lib, "TKSTEP209.lib")
 
 
 //辅助函数：判断两根线是否在 0.01mm 容差内首尾相接 ---国延林 2026.6
@@ -816,7 +827,7 @@ public:
     {
         if (!myView().IsNull())
         {
-            myView()->SetComputedMode(Standard_True);
+            myView()->SetComputedMode(Standard_False);
             myView()->Redraw();
         }
     }
@@ -1646,7 +1657,7 @@ public:
             params.NbMsaaSamples = 8;
 #endif
 
-            myView()->SetComputedMode(Standard_True);
+            myView()->SetComputedMode(Standard_False);
 
             // 深度裁剪重新适配，避免线框或 2D 曲线被裁掉。
             myView()->ZFitAll();
@@ -2078,59 +2089,207 @@ public:
         }
         return true;
     }
-    bool ExportVisibleToSTEP(System::String^ filePath)
+    bool ExportVisibleToSTEP(System::String^ filePath,array<System::String^>^ componentNames,array<array<int>^>^ componentShapeIds)
     {
-        if (myAISContext().IsNull() || GlobalShapeMap.empty()) {
-            return false;
-        }
-
-        // 1. 初始化 OCC 的 STEP 写入器
-        STEPControl_Writer writer;
-
-        // 【硬核拔高点】：显式设置导出单位为毫米（MM），防止导入 CAE 软件时尺寸缩放 1000 倍
-        Interface_Static::SetCVal("write.step.unit", "MM");
-        // 设置导出模式为 AsIs (保持原有拓扑不退化)
-        Interface_Static::SetIVal("write.step.schema", 5); // AP214 标准，CAE 软件兼容性最好
-
-        int exportCount = 0;
-
-        // 2. 遍历我们的档案室，精准排查可见图形，安全避开 ViewCube 等 UI 原住民
-        for (auto const& pair : GlobalShapeMap)
+        if (myAISContext().IsNull()
+            || GlobalShapeMap.empty()
+            || componentNames == nullptr
+            || componentShapeIds == nullptr
+            || componentNames->Length == 0
+            || componentNames->Length != componentShapeIds->Length)
         {
-            Handle(AIS_InteractiveObject) aisObj = pair.second;
-
-            // 核心过滤器：只有当前在黑色屏幕中“正在显示”的物体，才允许加入导出队列
-            if (!aisObj.IsNull() && myAISContext()->IsDisplayed(aisObj))
-            {
-                // 将 AIS 可视化对象向下转型为拓扑 Shape 对象
-                TopoDS_Shape shape = Handle(AIS_Shape)::DownCast(aisObj)->Shape();
-
-                if (!shape.IsNull())
-                {
-                    // 将几何形状塞进 STEP 缓冲器
-                    writer.Transfer(shape, STEPControl_AsIs);
-                    exportCount++;
-                }
-            }
-        }
-
-        // 如果视口里所有图层都隐藏了，没东西可导，就直接返回失败
-        if (exportCount == 0) {
             return false;
         }
 
-        // 3. 【跨界通讯】：将 C# 的 System::String^ 安全转换为 C++ 认的 char* 路径
-        using namespace System::Runtime::InteropServices;
-        char* cPath = (char*)(Marshal::StringToHGlobalAnsi(filePath)).ToPointer();
+        // ----------------------------------------------------------
+        // 1. 创建 XCAF 文档
+        // ----------------------------------------------------------
+        Handle(TDocStd_Document) document;
 
-        // 4. 正式写入磁盘
-        IFSelect_ReturnStatus status = writer.Write(cPath);
+        XCAFApp_Application::GetApplication()->NewDocument(
+            "MDTV-XCAF",
+            document);
 
-        // 5. 【极其重要】：手动释放由 Marshal 申请的非托管内存，严防内存泄漏
-        Marshal::FreeHGlobal(System::IntPtr(cPath));
+        if (document.IsNull())
+        {
+            return false;
+        }
 
-        // 判断 OCC 写入状态是否为成功 (IFSelect_RetDone)
-        return (status == IFSelect_RetDone);
+        Handle(XCAFDoc_ShapeTool) shapeTool =
+            XCAFDoc_DocumentTool::ShapeTool(document->Main());
+
+        if (shapeTool.IsNull())
+        {
+            return false;
+        }
+
+        // ----------------------------------------------------------
+        // 2. 创建整个轮胎模型的根装配
+        // ----------------------------------------------------------
+        TDF_Label rootAssemblyLabel =
+            shapeTool->NewShape();
+
+        TDataStd_Name::Set(
+            rootAssemblyLabel,
+            TCollection_ExtendedString("Tire_Assembly"));
+
+        int exportedComponentCount = 0;
+
+        // ----------------------------------------------------------
+        // 3. 每个软件 Component 创建一个 STEP Part
+        // ----------------------------------------------------------
+        for (int componentIndex = 0;
+            componentIndex < componentShapeIds->Length;
+            ++componentIndex)
+        {
+            array<int>^ shapeIds =
+                componentShapeIds[componentIndex];
+
+            if (shapeIds == nullptr || shapeIds->Length == 0)
+            {
+                continue;
+            }
+
+            // 一个 Component 对应一个 Compound
+            BRep_Builder compoundBuilder;
+            TopoDS_Compound componentCompound;
+
+            compoundBuilder.MakeCompound(componentCompound);
+
+            int exportedShapeCount = 0;
+
+            // 将当前 Component 中的所有面放入 Compound
+            for each (int shapeId in shapeIds)
+            {
+                auto shapeIterator =
+                    GlobalShapeMap.find(shapeId);
+
+                if (shapeIterator == GlobalShapeMap.end())
+                {
+                    continue;
+                }
+
+                Handle(AIS_InteractiveObject) aisObject =
+                    shapeIterator->second;
+
+                if (aisObject.IsNull())
+                {
+                    continue;
+                }
+
+                // 保持原有逻辑：隐藏的面不导出
+                if (!myAISContext()->IsDisplayed(aisObject))
+                {
+                    continue;
+                }
+
+                Handle(AIS_Shape) aisShape =
+                    Handle(AIS_Shape)::DownCast(aisObject);
+
+                if (aisShape.IsNull())
+                {
+                    continue;
+                }
+
+                TopoDS_Shape shape = aisShape->Shape();
+
+                if (shape.IsNull())
+                {
+                    continue;
+                }
+
+                compoundBuilder.Add(
+                    componentCompound,
+                    shape);
+
+                ++exportedShapeCount;
+            }
+
+            // 整个 Component 为空或已隐藏时不导出
+            if (exportedShapeCount == 0)
+            {
+                continue;
+            }
+
+            // ------------------------------------------------------
+            // 4. 把 Compound 登记成一个 Part
+            //
+            // Standard_False 非常重要：
+            // 表示 Compound 是一个 Part，而不是继续展开为子装配。
+            // ------------------------------------------------------
+            TDF_Label partLabel =
+                shapeTool->AddShape(
+                    componentCompound,
+                    Standard_False);
+
+            // 设置 Component 名称
+            TCollection_AsciiString componentNameAscii =
+                toAsciiString(componentNames[componentIndex]);
+
+            TCollection_ExtendedString componentName(
+                componentNameAscii.ToCString(),
+                Standard_True);
+
+            TDataStd_Name::Set(
+                partLabel,
+                componentName);
+
+            // 将 Part 挂到 Tire_Assembly 根装配下面
+            TDF_Label instanceLabel =
+                shapeTool->AddComponent(
+                    rootAssemblyLabel,
+                    partLabel,
+                    TopLoc_Location());
+
+            // 同时给装配实例设置名称
+            TDataStd_Name::Set(
+                instanceLabel,
+                componentName);
+
+            ++exportedComponentCount;
+        }
+
+        if (exportedComponentCount == 0)
+        {
+            return false;
+        }
+
+        // 根据 Component 关系重新计算根装配 Compound
+        shapeTool->UpdateAssemblies();
+
+        // ----------------------------------------------------------
+        // 5. 使用 STEPCAFControl_Writer 导出层级
+        // ----------------------------------------------------------
+        Interface_Static::SetCVal(
+            "write.step.unit",
+            "MM");
+
+        // 保留你原来使用的 AP214 设置
+        Interface_Static::SetIVal(
+            "write.step.schema",
+            5);
+
+        STEPCAFControl_Writer writer;
+
+        // 只要求名称和装配层级，不导出颜色、图层
+        writer.SetNameMode(Standard_True);
+        writer.SetColorMode(Standard_False);
+        writer.SetLayerMode(Standard_False);
+
+        if (!writer.Transfer(
+            document,
+            STEPControl_AsIs))
+        {
+            return false;
+        }
+
+        TCollection_AsciiString outputPath =
+            toAsciiString(filePath);
+
+        IFSelect_ReturnStatus writeStatus =
+            writer.Write(outputPath.ToCString());
+
+        return writeStatus == IFSelect_RetDone;
     }
 
     /// <summary>
@@ -3460,30 +3619,67 @@ public:
             }
         }
 
-        // 6. 渲染包装 (保留之前的材质与黑色边框逻辑)
-        Handle(AIS_Shape) faceAis = new AIS_Shape(finalShape);
-        faceAis->Attributes()->SetFaceBoundaryDraw(true);
-        faceAis->Attributes()->SetFaceBoundaryAspect(new Prs3d_LineAspect(Quantity_NOC_BLACK, Aspect_TOL_SOLID, 2.0));
+        if (finalShape.IsNull())
+        {
+            return false;
+        }
 
-        // 5. 登记入册并渲染
+        // 防止布尔运算成功，但得到的是不包含面的空结果
+        TopExp_Explorer faceCheck(finalShape, TopAbs_FACE);
+        if (!faceCheck.More())
+        {
+            return false;
+        }
+
+        // 使用已有的高质量显示函数创建 AIS 对象
+        Handle(AIS_Shape) faceAis = MakeHighQualityAISShape(finalShape);
+        if (faceAis.IsNull())
+        {
+            return false;
+        }
+
+        // 设置边界显示
+        faceAis->Attributes()->SetFaceBoundaryDraw(Standard_True);
+        faceAis->Attributes()->SetFaceBoundaryAspect(
+            new Prs3d_LineAspect(
+                Quantity_NOC_BLACK,
+                Aspect_TOL_SOLID,
+                2.0));
+
+        // 设置面的颜色和着色模式
+        Quantity_Color compColor(
+            r / 255.0,
+            g / 255.0,
+            b / 255.0,
+            Quantity_TOC_RGB);
+
+        faceAis->SetDisplayMode(AIS_Shaded);
+        faceAis->SetColor(compColor);
+
+        // 防止 ID 冲突时旧对象残留
+        auto oldObject = GlobalShapeMap.find(newFaceId);
+        if (oldObject != GlobalShapeMap.end())
+        {
+            if (!oldObject->second.IsNull())
+            {
+                myAISContext()->Remove(oldObject->second, Standard_False);
+            }
+
+            GlobalShapeMap.erase(oldObject);
+        }
+
+        // 登记并显示新面
         GlobalShapeMap[newFaceId] = faceAis;
+        myAISContext()->Display(faceAis, Standard_False);
 
-        // 开启实体着色模式 (1 = AIS_Shaded)
-        myAISContext()->SetDisplayMode(faceAis, 1, Standard_False);
+        // 清除原边线的选择高亮并刷新
+        myAISContext()->ClearSelected(Standard_False);
+        myAISContext()->UpdateCurrentViewer();
 
-        // ==========================================================
-        // 【核心修改】：使用 C# 传过来的 RGB 颜色，生成 OCC 颜色对象
-        // ==========================================================
-        Quantity_Color compColor(r / 255.0, g / 255.0, b / 255.0, Quantity_TOC_RGB);
-        myAISContext()->SetColor(faceAis, compColor, Standard_False);
-
-        // 依然保持 50% 透明度，方便看清内部线框
-        myAISContext()->SetTransparency(faceAis, 0.5, Standard_False);
-
-        myAISContext()->Display(faceAis, Standard_True);
-        /*myAISContext()->ClearSelected(Standard_False);
-        myAISContext()->UpdateCurrentViewer();*/
-
+        if (!myView().IsNull())
+        {
+            myView()->Redraw();
+        }
 
         return true;
     }

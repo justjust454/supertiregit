@@ -138,7 +138,7 @@ Class OCCTProxy: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
     ExportBRep(TCollection_AsciiString* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig
     ExportStep(String): PrivateScope, Public, HideBySig
     ExportStep2(String): PrivateScope, Public, HideBySig
-    ExportVisibleToSTEP(String): PrivateScope, Public, HideBySig
+    ExportVisibleToSTEP(String, String[], Int32[][]): PrivateScope, Public, HideBySig
     ExportIges(TCollection_AsciiString* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig
     ExportVrml(TCollection_AsciiString* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig
     ExportStl(TCollection_AsciiString* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig

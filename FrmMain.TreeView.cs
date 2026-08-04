@@ -99,13 +99,28 @@ namespace UI
             // 1. 改变界面 UI (文字变灰/变黑)
             if (isShow)
             {
-                selectedLayer.ForeColor = System.Drawing.Color.Black;
-                selectedLayer.Text = selectedLayer.Text.Replace(" [已隐藏]", "");
+                // Component 的 Tag 中保存了原始颜色
+                if (selectedLayer.Tag is Color originalColor)
+                {
+                    selectedLayer.ForeColor = originalColor;
+                }
+                else
+                {
+                    // 普通图层没有专属颜色，恢复为黑色
+                    selectedLayer.ForeColor = Color.Black;
+                }
+
+                selectedLayer.Text =
+                    selectedLayer.Text.Replace(" [已隐藏]", "");
             }
             else
             {
-                selectedLayer.ForeColor = System.Drawing.Color.Gray;
-                if (!selectedLayer.Text.EndsWith("[已隐藏]")) selectedLayer.Text += " [已隐藏]";
+                selectedLayer.ForeColor = Color.Gray;
+
+                if (!selectedLayer.Text.EndsWith("[已隐藏]"))
+                {
+                    selectedLayer.Text += " [已隐藏]";
+                }
             }
 
             // 2. 【核心通讯】：如果这个图层在我们的花名册里
@@ -198,10 +213,21 @@ namespace UI
             {
                 List<int> idsInLayer = layerPair.Value;
 
-                if (idsInLayer.Contains(targetId))
+                if (idsInLayer.Remove(targetId))
                 {
-                    idsInLayer.Remove(targetId); // 注销死掉的 ID
-                    break; // 因为一个 ID 只会存在于一个图层中，删完直接跳出循环
+                    TreeNode nodeToRemove = null;
+
+                    foreach (TreeNode childNode in layerPair.Key.Nodes)
+                    {
+                        if (childNode.Tag is int shapeId && shapeId == targetId)
+                        {
+                            nodeToRemove = childNode;
+                            break;
+                        }
+                    }
+
+                    nodeToRemove?.Remove();
+                    break;
                 }
             }
         }

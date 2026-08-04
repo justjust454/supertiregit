@@ -256,7 +256,36 @@ namespace UI
                     LogMessage("正在提取视口几何体并生成 B-Rep 拓扑数据...");
 
                     // 3. 呼叫 C++ 底层发功
-                    bool isSuccess = myOCCTProxy.ExportVisibleToSTEP(saveDlg.FileName);
+                    List<string> componentNames = new List<string>();
+                    List<int[]> componentShapeGroups = new List<int[]>();
+
+                    foreach (var layerPair in layerShapesMap)
+                    {
+                        TreeNode componentNode = layerPair.Key;
+
+                        // 只导出 Component，普通 DXF 图层和帘线图层不参与
+                        if (!componentNode.Text.StartsWith(
+                                "Component",
+                                StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        string componentName = componentNode.Text
+                            .Replace(" (Current)", "")
+                            .Replace(" [已隐藏]", "");
+
+                        componentNames.Add(componentName);
+                        componentShapeGroups.Add(layerPair.Value.ToArray());
+                    }
+
+                    // C# 的 int[][] 对应 C++/CLI 的 array<array<int>^>^
+                    bool isSuccess =
+                        componentShapeGroups.Count > 0 &&
+                        myOCCTProxy.ExportVisibleToSTEP(
+                            saveDlg.FileName,
+                            componentNames.ToArray(),
+                            componentShapeGroups.ToArray());
 
                     // 4. 恢复默认光标
                     this.Cursor = Cursors.Default;

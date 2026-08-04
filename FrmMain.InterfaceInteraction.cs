@@ -416,17 +416,20 @@ namespace UI
 
                                         if (isSuccess)
                                         {
-                                            // 1. 内存花名册里登记造册
+                                            // 1. 在帘线图层中登记实体 ID
                                             layerShapesMap[activeNode].Add(newCordId);
 
-                                            // 2. 左侧树状图里生成新节点（强制绿色）
-                                            TreeNode cordNode = new TreeNode($"帘线_{newCordId}");
-                                            cordNode.ForeColor = Color.Green;
+                                            // 2. 创建帘线节点，并将实体 ID 保存到 Tag
+                                            TreeNode cordNode = new TreeNode($"帘线_{newCordId}")
+                                            {
+                                                ForeColor = Color.Green,
+                                                Tag = newCordId
+                                            };
 
                                             activeNode.Nodes.Add(cordNode);
-                                            activeNode.Expand(); // 自动展开树让用户看到
+                                            activeNode.Expand();
 
-                                            LogMessage($"生成成功");
+                                            LogMessage("生成成功");
                                         }
                                         else
                                         {
@@ -491,6 +494,7 @@ namespace UI
 
             // 赋予专属颜色
             compNode.ForeColor = compColor;
+            compNode.Tag = compColor;
 
             baseNode.Nodes.Add(compNode);
 
