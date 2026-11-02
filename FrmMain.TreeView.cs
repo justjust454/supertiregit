@@ -5,7 +5,6 @@ using System.Windows.Forms;
 
 namespace UI
 {
-    internal class TreeViewHelper { }
 
     public partial class FrmMain
     {
@@ -20,6 +19,7 @@ namespace UI
             this.treeView1.BeginUpdate();
 
             // 1. 清空旧树
+            currentLineLayerNode = null;
             this.treeView1.Nodes.Clear();
 
             // 2. 创建根节点 (显示文件名)
@@ -85,57 +85,157 @@ namespace UI
             layerContextMenu.Items.Add(showItem);
         }
 
-        
-        
+
+
 
         /// <summary>
-        /// 执行隐藏/显示的 UI 逻辑
+        /// 删除树节点名称中的显隐状态文字
         /// </summary>
-        private void ToggleLayerVisibility(bool isShow)
+        private string RemoveVisibilityText(string text)
         {
-            TreeNode selectedLayer = this.treeView1.SelectedNode;
-            if (selectedLayer == null) return;
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
 
-            // 1. 改变界面 UI (文字变灰/变黑)
+            return text.Replace(" [已隐藏]", "");
+        }
+
+
+        /// <summary>
+        /// 获取树节点原本应该显示的颜色
+        /// </summary>
+        private Color GetTreeNodeOriginalColor(TreeNode node)
+        {
+            if (node == null)
+                return Color.Black;
+
+            // Component 节点的 Tag 中保存了 Component 原始颜色
+            if (node.Tag is Color nodeColor)
+                return nodeColor;
+
+            // 面节点的 Tag 保存的是 Shape ID，
+            // 所以从父 Component 的 Tag 中读取原始颜色
+            if (node.Parent != null &&
+                node.Parent.Tag is Color parentColor)
+            {
+                return parentColor;
+            }
+
+            return Color.Black;
+        }
+
+
+        /// <summary>
+        /// 更新单个树节点的显隐文字和颜色
+        /// </summary>
+        private void SetTreeNodeVisibilityAppearance(
+            TreeNode node,
+            bool isShow)
+        {
+            if (node == null)
+                return;
+
+            node.Text = RemoveVisibilityText(node.Text);
+
             if (isShow)
             {
-                // Component 的 Tag 中保存了原始颜色
-                if (selectedLayer.Tag is Color originalColor)
-                {
-                    selectedLayer.ForeColor = originalColor;
-                }
-                else
-                {
-                    // 普通图层没有专属颜色，恢复为黑色
-                    selectedLayer.ForeColor = Color.Black;
-                }
-
-                selectedLayer.Text =
-                    selectedLayer.Text.Replace(" [已隐藏]", "");
+                node.ForeColor =
+                    GetTreeNodeOriginalColor(node);
             }
             else
             {
-                selectedLayer.ForeColor = Color.Gray;
-
-                if (!selectedLayer.Text.EndsWith("[已隐藏]"))
-                {
-                    selectedLayer.Text += " [已隐藏]";
-                }
+                node.ForeColor = Color.Gray;
+                node.Text += " [已隐藏]";
             }
+        }
 
-            // 2. 【核心通讯】：如果这个图层在我们的花名册里
-            if (layerShapesMap.ContainsKey(selectedLayer))
+
+        /// <summary>
+        /// 隐藏或显示 Component、图层以及单个面
+        /// </summary>
+        private void ToggleLayerVisibility(bool isShow)
+        {
+            TreeNode selectedNode =
+                treeView1.SelectedNode;
+
+            if (selectedNode == null ||
+                myOCCTProxy == null)
             {
-                // 遍历这个图层管辖的所有图形 ID
-                foreach (int shapeId in layerShapesMap[selectedLayer])
+                return;
+            }
+
+            // ========================================================
+            // 情况一：右键点击的是单个面节点
+            //
+            // 面节点的 Tag 中保存的是 newFaceId。
+            // 此时只修改这一个面，不遍历整个 Component。
+            // ========================================================
+            if (selectedNode.Tag is int shapeId)
+            {
+                SetTreeNodeVisibilityAppearance(
+                    selectedNode,
+                    isShow);
+
+                myOCCTProxy.SetShapeVisibility(
+                    shapeId,
+                    isShow);
+
+                // 如果 Component 原来处于整体隐藏状态，
+                // 现在单独显示其中一个面，则父节点不应继续显示“已隐藏”
+                if (isShow &&
+                    selectedNode.Parent != null)
                 {
-                    // 下达指令给 C++：改变这个 ID 图形的显隐状态！
-                    myOCCTProxy.SetShapeVisibility(shapeId, isShow);
+                    TreeNode parentNode =
+                        selectedNode.Parent;
+
+                    parentNode.Text =
+                        RemoveVisibilityText(parentNode.Text);
+
+                    parentNode.ForeColor =
+                        GetTreeNodeOriginalColor(parentNode);
                 }
 
-                // 批量处理完后，统一刷新一次 3D 视口，拒绝卡顿！
                 myOCCTProxy.UpdateCurrentViewer();
+                return;
             }
+
+            // ========================================================
+            // 情况二：右键点击的是 Component 或普通图层
+            //
+            // 保留原来的整体隐藏/显示功能。
+            // ========================================================
+            List<int> shapeIds;
+
+            if (!layerShapesMap.TryGetValue(
+                selectedNode,
+                out shapeIds))
+            {
+                return;
+            }
+
+            SetTreeNodeVisibilityAppearance(
+                selectedNode,
+                isShow);
+
+            // 整体修改 Component 中的所有几何体
+            foreach (int currentShapeId in shapeIds)
+            {
+                myOCCTProxy.SetShapeVisibility(
+                    currentShapeId,
+                    isShow);
+            }
+
+            // 同步修改 Component 下面每个面节点的字体状态
+            foreach (TreeNode childNode in selectedNode.Nodes)
+            {
+                if (childNode.Tag is int)
+                {
+                    SetTreeNodeVisibilityAppearance(
+                        childNode,
+                        isShow);
+                }
+            }
+
+            myOCCTProxy.UpdateCurrentViewer();
         }
         private void UpdateTreeAfterCombine(int oldId1, int oldId2, int newId)
         {
@@ -232,6 +332,66 @@ namespace UI
             }
         }
         /// <summary>
+        /// 判断节点是否是可以保存手工直线的普通图层。
+        /// 同时兼容项目中已有的半角冒号“图层:”和全角冒号“图层：”。
+        /// </summary>
+        private bool IsLineDrawingLayerNode(TreeNode node)
+        {
+            if (node == null || !layerShapesMap.ContainsKey(node))
+                return false;
+
+            string nodeText = RemoveVisibilityText(node.Text);
+            return nodeText.StartsWith("图层:", StringComparison.Ordinal) ||
+                nodeText.StartsWith("图层：", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 返回不包含 Current 和隐藏状态后缀的图层名称。
+        /// </summary>
+        private string GetLineLayerName(TreeNode node)
+        {
+            if (node == null)
+                return "未设置图层";
+
+            return RemoveVisibilityText(node.Text)
+                .Replace(" (Current)", "")
+                .Trim();
+        }
+
+        /// <summary>
+        /// 将指定普通图层设为手工直线的当前保存图层。
+        /// 该状态独立于面创建使用的 Current Component。
+        /// </summary>
+        private void SetCurrentLineLayer(TreeNode targetNode)
+        {
+            if (!IsLineDrawingLayerNode(targetNode))
+                return;
+
+            // 恢复上一个当前图层的普通显示样式。
+            if (currentLineLayerNode != null &&
+                currentLineLayerNode != targetNode)
+            {
+                currentLineLayerNode.Text =
+                    currentLineLayerNode.Text.Replace(" (Current)", "");
+                currentLineLayerNode.NodeFont =
+                    new Font(treeView1.Font, FontStyle.Regular);
+            }
+
+            currentLineLayerNode = targetNode;
+
+            if (!currentLineLayerNode.Text.Contains(" (Current)"))
+                currentLineLayerNode.Text += " (Current)";
+
+            currentLineLayerNode.NodeFont =
+                new Font(treeView1.Font, FontStyle.Bold);
+            treeView1.SelectedNode = currentLineLayerNode;
+
+            LogMessage(
+                $"当前绘图图层已切换为: {GetLineLayerName(currentLineLayerNode)}。" +
+                "后续手工创建的直线将保存到该图层。");
+        }
+
+        /// <summary>
         /// 拦截树状图的鼠标点击事件
         /// </summary>
         private void treeView1_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
@@ -252,6 +412,20 @@ namespace UI
                 var showItem = new ToolStripMenuItem("显示 (Show)");
                 showItem.Click += (s, args) => ToggleLayerVisibility(true);
                 dynamicMenu.Items.Add(showItem);
+
+                // 任一普通图层都可以设为手工直线的当前保存图层。
+                if (IsLineDrawingLayerNode(e.Node))
+                {
+                    dynamicMenu.Items.Add(new ToolStripSeparator());
+
+                    var makeCurrentLayerItem =
+                        new ToolStripMenuItem("设置为当前 (Make Current)");
+                    makeCurrentLayerItem.Checked =
+                        currentLineLayerNode == e.Node;
+                    makeCurrentLayerItem.Click +=
+                        (s, args) => SetCurrentLineLayer(e.Node);
+                    dynamicMenu.Items.Add(makeCurrentLayerItem);
+                }
 
                 // 1. 如果右键点击的是“图纸”或“基体” (根级节点)
                 if(e.Node.Level == 0)
@@ -283,10 +457,11 @@ namespace UI
                     dynamicMenu.Items.Add(createCompItem);
                 }
 
-                // 2. 如果右键点击的是具体的“图层”或“Component”
-                else if (e.Node.Text.StartsWith("Component") || e.Node.Text.Contains("图层：帘线"))
+                // 2. Component 的 Current 状态继续单独用于面创建和拓扑编辑。
+                else if (e.Node.Text.StartsWith("Component"))
                 {
-                    var makeCurrentItem = new ToolStripMenuItem(" Make Current");
+                    var makeCurrentItem =
+                        new ToolStripMenuItem("设置为当前组件 (Make Current Component)");
                     makeCurrentItem.Click += (s, args) => SetCurrentComponent(e.Node);
                     dynamicMenu.Items.Add(makeCurrentItem);
 

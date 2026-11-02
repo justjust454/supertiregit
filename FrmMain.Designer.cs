@@ -35,12 +35,15 @@ namespace UI
             this.btnDrawBox = new System.Windows.Forms.ToolStripButton();
             this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbParametricTire = new System.Windows.Forms.ToolStripButton();
             this.tsbDelete = new System.Windows.Forms.ToolStripButton();
-            this.tsbAutoCombine = new System.Windows.Forms.ToolStripButton();
             this.tsbCombine = new System.Windows.Forms.ToolStripButton();
+            this.tsbAutoCombine = new System.Windows.Forms.ToolStripButton();
             this.tsbSplit = new System.Windows.Forms.ToolStripButton();
             this.tsbSurfaceCreate = new System.Windows.Forms.ToolStripButton();
             this.tsbCordCreate = new System.Windows.Forms.ToolStripButton();
+            this.tsbTopologyEdit = new System.Windows.Forms.ToolStripButton();
+            this.tsbLineCreate = new System.Windows.Forms.ToolStripButton();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.treeView1 = new System.Windows.Forms.TreeView();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
@@ -69,15 +72,18 @@ namespace UI
             this.btnDrawBox,
             this.toolStripButton2,
             this.toolStripSeparator1,
+            this.tsbParametricTire,
             this.tsbDelete,
-            this.tsbAutoCombine,
+            this.tsbLineCreate,
             this.tsbCombine,
+            this.tsbAutoCombine,
             this.tsbSplit,
             this.tsbSurfaceCreate,
-            this.tsbCordCreate});
+            this.tsbCordCreate,
+            this.tsbTopologyEdit});
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
-            this.toolStrip1.Size = new System.Drawing.Size(1071, 25);
+            this.toolStrip1.Size = new System.Drawing.Size(1071, 31);
             this.toolStrip1.TabIndex = 1;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -85,9 +91,10 @@ namespace UI
             // 
             this.tsbNew.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
             this.tsbNew.Image = ((System.Drawing.Image)(resources.GetObject("tsbNew.Image")));
+            this.tsbNew.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
             this.tsbNew.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbNew.Name = "tsbNew";
-            this.tsbNew.Size = new System.Drawing.Size(23, 22);
+            this.tsbNew.Size = new System.Drawing.Size(28, 28);
             this.tsbNew.Text = "toolStripButton1";
             this.tsbNew.Click += new System.EventHandler(this.tsbNew_Click);
             // 
@@ -95,9 +102,10 @@ namespace UI
             // 
             this.btnDrawBox.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
             this.btnDrawBox.Image = ((System.Drawing.Image)(resources.GetObject("btnDrawBox.Image")));
+            this.btnDrawBox.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
             this.btnDrawBox.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnDrawBox.Name = "btnDrawBox";
-            this.btnDrawBox.Size = new System.Drawing.Size(23, 22);
+            this.btnDrawBox.Size = new System.Drawing.Size(28, 28);
             this.btnDrawBox.Text = "toolStripButton1";
             this.btnDrawBox.Click += new System.EventHandler(this.tsbImport_Click);
             // 
@@ -105,16 +113,26 @@ namespace UI
             // 
             this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
             this.toolStripButton2.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton2.Image")));
+            this.toolStripButton2.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
             this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton2.Name = "toolStripButton2";
-            this.toolStripButton2.Size = new System.Drawing.Size(23, 22);
+            this.toolStripButton2.Size = new System.Drawing.Size(28, 28);
             this.toolStripButton2.Text = "toolStripButton2";
             this.toolStripButton2.Click += new System.EventHandler(this.tsbExport_Click);
             // 
             // toolStripSeparator1
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 25);
+            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 31);
+            // 
+            // tsbParametricTire
+            // 
+            this.tsbParametricTire.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.tsbParametricTire.Name = "tsbParametricTire";
+            this.tsbParametricTire.Size = new System.Drawing.Size(86, 28);
+            this.tsbParametricTire.Text = "参数化建模";
+            this.tsbParametricTire.ToolTipText = "根据手册默认参数生成轮胎二维截面";
+            this.tsbParametricTire.Click += new System.EventHandler(this.tsbParametricTire_Click);
             // 
             // tsbDelete
             // 
@@ -122,19 +140,9 @@ namespace UI
             this.tsbDelete.Image = ((System.Drawing.Image)(resources.GetObject("tsbDelete.Image")));
             this.tsbDelete.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbDelete.Name = "tsbDelete";
-            this.tsbDelete.Size = new System.Drawing.Size(23, 22);
+            this.tsbDelete.Size = new System.Drawing.Size(23, 28);
             this.tsbDelete.Text = "tsbDelete";
             this.tsbDelete.Click += new System.EventHandler(this.tsbDelete_Click);
-            // 
-            // tsbAutoCombine
-            // 
-            this.tsbAutoCombine.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tsbAutoCombine.Image = ((System.Drawing.Image)(resources.GetObject("tsbAutoCombine.Image")));
-            this.tsbAutoCombine.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tsbAutoCombine.Name = "tsbAutoCombine";
-            this.tsbAutoCombine.Size = new System.Drawing.Size(23, 22);
-            this.tsbAutoCombine.Text = "Combine";
-            this.tsbAutoCombine.Click += new System.EventHandler(this.tsbAutoCombine_Click);
             // 
             // tsbCombine
             // 
@@ -142,9 +150,19 @@ namespace UI
             this.tsbCombine.Image = ((System.Drawing.Image)(resources.GetObject("tsbCombine.Image")));
             this.tsbCombine.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbCombine.Name = "tsbCombine";
-            this.tsbCombine.Size = new System.Drawing.Size(23, 22);
+            this.tsbCombine.Size = new System.Drawing.Size(23, 28);
             this.tsbCombine.Text = "toolStripButton1";
             this.tsbCombine.Click += new System.EventHandler(this.tsbCombine_Click);
+            // 
+            // tsbAutoCombine
+            // 
+            this.tsbAutoCombine.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.tsbAutoCombine.Image = ((System.Drawing.Image)(resources.GetObject("tsbAutoCombine.Image")));
+            this.tsbAutoCombine.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbAutoCombine.Name = "tsbAutoCombine";
+            this.tsbAutoCombine.Size = new System.Drawing.Size(23, 28);
+            this.tsbAutoCombine.Text = "Combine";
+            this.tsbAutoCombine.Click += new System.EventHandler(this.tsbAutoCombine_Click);
             // 
             // tsbSplit
             // 
@@ -152,7 +170,7 @@ namespace UI
             this.tsbSplit.Image = ((System.Drawing.Image)(resources.GetObject("tsbSplit.Image")));
             this.tsbSplit.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbSplit.Name = "tsbSplit";
-            this.tsbSplit.Size = new System.Drawing.Size(23, 22);
+            this.tsbSplit.Size = new System.Drawing.Size(23, 28);
             this.tsbSplit.Text = "tsbSplit";
             this.tsbSplit.Click += new System.EventHandler(this.tsbSplit_Click);
             // 
@@ -162,7 +180,7 @@ namespace UI
             this.tsbSurfaceCreate.Image = ((System.Drawing.Image)(resources.GetObject("tsbSurfaceCreate.Image")));
             this.tsbSurfaceCreate.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbSurfaceCreate.Name = "tsbSurfaceCreate";
-            this.tsbSurfaceCreate.Size = new System.Drawing.Size(23, 22);
+            this.tsbSurfaceCreate.Size = new System.Drawing.Size(23, 28);
             this.tsbSurfaceCreate.Text = "Surface Create";
             this.tsbSurfaceCreate.Click += new System.EventHandler(this.tsbSurfaceCreate_Click);
             // 
@@ -172,14 +190,35 @@ namespace UI
             this.tsbCordCreate.Image = ((System.Drawing.Image)(resources.GetObject("tsbCordCreate.Image")));
             this.tsbCordCreate.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbCordCreate.Name = "tsbCordCreate";
-            this.tsbCordCreate.Size = new System.Drawing.Size(23, 22);
+            this.tsbCordCreate.Size = new System.Drawing.Size(23, 28);
             this.tsbCordCreate.Text = "CordCreate";
             this.tsbCordCreate.Click += new System.EventHandler(this.tsbCordCreate_Click);
+            // 
+            // tsbTopologyEdit
+            // 
+            this.tsbTopologyEdit.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.tsbTopologyEdit.Image = ((System.Drawing.Image)(resources.GetObject("tsbTopologyEdit.Image")));
+            this.tsbTopologyEdit.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbTopologyEdit.Name = "tsbTopologyEdit";
+            this.tsbTopologyEdit.Size = new System.Drawing.Size(23, 28);
+            this.tsbTopologyEdit.Text = "tsbTopologyEdit";
+            this.tsbTopologyEdit.Click += new System.EventHandler(this.tsbTopologyEdit_Click_1);
+            // 
+            // tsbLineCreate
+            // 
+            this.tsbLineCreate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.tsbLineCreate.Image = ((System.Drawing.Image)(resources.GetObject("tsbLineCreate.Image")));
+            this.tsbLineCreate.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbLineCreate.Name = "tsbLineCreate";
+            this.tsbLineCreate.Size = new System.Drawing.Size(23, 28);
+            this.tsbLineCreate.Text = "直线绘制";
+            this.tsbLineCreate.ToolTipText = "在图纸平面上通过两点绘制直线";
+            this.tsbLineCreate.Click += new System.EventHandler(this.tsbLineCreate_Click);
             // 
             // splitContainer1
             // 
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer1.Location = new System.Drawing.Point(0, 25);
+            this.splitContainer1.Location = new System.Drawing.Point(0, 31);
             this.splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
@@ -189,7 +228,7 @@ namespace UI
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.splitContainer2);
-            this.splitContainer1.Size = new System.Drawing.Size(1071, 522);
+            this.splitContainer1.Size = new System.Drawing.Size(1071, 516);
             this.splitContainer1.SplitterDistance = 125;
             this.splitContainer1.TabIndex = 2;
             // 
@@ -198,7 +237,7 @@ namespace UI
             this.treeView1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.treeView1.Location = new System.Drawing.Point(0, 0);
             this.treeView1.Name = "treeView1";
-            this.treeView1.Size = new System.Drawing.Size(125, 522);
+            this.treeView1.Size = new System.Drawing.Size(125, 516);
             this.treeView1.TabIndex = 0;
             this.treeView1.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.treeView1_AfterSelect);
             this.treeView1.NodeMouseClick += new System.Windows.Forms.TreeNodeMouseClickEventHandler(this.treeView1_NodeMouseClick);
@@ -217,8 +256,8 @@ namespace UI
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.richTextBoxLog);
-            this.splitContainer2.Size = new System.Drawing.Size(942, 522);
-            this.splitContainer2.SplitterDistance = 441;
+            this.splitContainer2.Size = new System.Drawing.Size(942, 516);
+            this.splitContainer2.SplitterDistance = 435;
             this.splitContainer2.TabIndex = 0;
             // 
             // panel2D
@@ -227,7 +266,7 @@ namespace UI
             this.panel2D.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panel2D.Location = new System.Drawing.Point(0, 0);
             this.panel2D.Name = "panel2D";
-            this.panel2D.Size = new System.Drawing.Size(942, 441);
+            this.panel2D.Size = new System.Drawing.Size(942, 435);
             this.panel2D.TabIndex = 0;
             this.panel2D.Paint += new System.Windows.Forms.PaintEventHandler(this.panel1_Paint_1);
             // 
@@ -237,7 +276,7 @@ namespace UI
             this.pnlFaceAction.Controls.Add(this.btnFaceCancel);
             this.pnlFaceAction.Controls.Add(this.btnFaceCreate);
             this.pnlFaceAction.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.pnlFaceAction.Location = new System.Drawing.Point(0, 418);
+            this.pnlFaceAction.Location = new System.Drawing.Point(0, 412);
             this.pnlFaceAction.Name = "pnlFaceAction";
             this.pnlFaceAction.Size = new System.Drawing.Size(942, 23);
             this.pnlFaceAction.TabIndex = 0;
@@ -281,7 +320,7 @@ namespace UI
             this.Controls.Add(this.toolStrip1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "FrmMain";
-            this.Text = "SuperTire_Preprocess";
+            this.Text = " ";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.toolStrip1.ResumeLayout(false);
             this.toolStrip1.PerformLayout();
@@ -305,6 +344,7 @@ namespace UI
         private System.Windows.Forms.ToolStripButton btnDrawBox;
         private System.Windows.Forms.ToolStripButton toolStripButton2;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+        private System.Windows.Forms.ToolStripButton tsbParametricTire;
         private System.Windows.Forms.ToolStripButton tsbNew;
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.TreeView treeView1;
@@ -320,6 +360,8 @@ namespace UI
         private System.Windows.Forms.Button btnFaceCreate;
         private System.Windows.Forms.ToolStripButton tsbCombine;
         private System.Windows.Forms.ToolStripButton tsbCordCreate;
+        private System.Windows.Forms.ToolStripButton tsbTopologyEdit;
+        private System.Windows.Forms.ToolStripButton tsbLineCreate;
     }
 }
 

@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 namespace UI
 {
-    internal class InterfaceInteraction { }
+
     public partial class FrmMain
     {
         private System.Drawing.Point lastMousePos;
@@ -22,7 +22,9 @@ namespace UI
             SplitLines,      //线条打断模式
             DeleteLines,      //线条删除模式
             CordCreate,        //
-            MakeFace         //面创建
+            MakeFace,         //面创建
+            TopologyEdit,     //拓扑编辑：自动寻找匹配边并缝合
+            LineCreate       //在图纸平面上通过两点绘制直线
         }
         private InteractionMode currentMode = InteractionMode.Normal;
         private List<int> selectedLinesForCombine = new List<int>(); // 暂存选中的线ID
@@ -31,6 +33,7 @@ namespace UI
         private List<int> selectedLinesForFace = new List<int>();
         private List<int> selectedLinesForAutoCombine = new List<int>();
         private List<int> selectedLinesForCord = new List<int>();
+        private List<int> selectedLinesForTopologyEdit = new List<int>();
 
 
 
@@ -46,15 +49,37 @@ namespace UI
         /// </summary>
         /// <param name="newMode">想要进入的新模式</param>
         /// <param name="activeButton">触发该模式的 ToolStripButton</param>
-        private void SwitchInteractionMode(InteractionMode newMode, ToolStripButton activeButton)
+        private void SwitchInteractionMode(InteractionMode newMode, ToolStripButton activeButton, bool topologyAlreadyClosed = false)
         {
-            // 1. 底层数据大清洗：无论切换到什么模式，先把上一个模式的残留数据全部清空
+            // 从拓扑编辑直接切换到其他工具时，默认保留当前拓扑结果
+            if (!topologyAlreadyClosed && currentMode == InteractionMode.TopologyEdit &&newMode != InteractionMode.TopologyEdit &&myOCCTProxy != null)
+            {
+                myOCCTProxy.FinishTopologyEdit();
+
+                // 直接切换到其他工具时也要关闭拓扑窗体
+                if (topologyEditForm != null)
+                    topologyEditForm.HideToolWindow();
+
+                topologyEditingComponentNode = null;
+                topologyOriginalShapeIds.Clear();
+            }
+
+            // 离开直线绘制模式时只清理尚未完成的预览线。
+            if (currentMode == InteractionMode.LineCreate &&
+                newMode != InteractionMode.LineCreate &&
+                myOCCTProxy != null)
+            {
+                myOCCTProxy.FinishLineCreate();
+            }
+
+            // 1. 底层数据清洗：无论切换到什么模式，先把上一个模式的残留数据全部清空
             selectedLinesForCombine.Clear();
             selectedLinesForSplit.Clear();
             selectedLinesForFace.Clear(); // 清空选面队列
             selectedLinesForDelete.Clear();
             selectedLinesForAutoCombine.Clear();
             selectedLinesForCord.Clear();
+            selectedLinesForTopologyEdit.Clear();
             if (myOCCTProxy != null)
             {
                 myOCCTProxy.ClearSelected();
@@ -71,6 +96,8 @@ namespace UI
             tsbSurfaceCreate.Checked = (activeButton == tsbSurfaceCreate);
             tsbCombine.Checked = (activeButton == tsbCombine);
             tsbCordCreate.Checked = (activeButton == tsbCordCreate);
+            tsbTopologyEdit.Checked = (activeButton == tsbTopologyEdit);
+            tsbLineCreate.Checked = (activeButton == tsbLineCreate);
 
             // 4. 鼠标指针统一管理
             if (newMode == InteractionMode.Normal)
@@ -79,13 +106,15 @@ namespace UI
             }
             else
             {
-                this.panel2D.Cursor = Cursors.Cross; // 合并/打断用十字准星
+                this.panel2D.Cursor = Cursors.Cross; // 十字准星
             }
             if (pnlFaceAction != null)
             {
                 pnlFaceAction.Visible = (newMode == InteractionMode.MakeFace);
 
             }
+            tsbTopologyEdit.Checked =(activeButton == tsbTopologyEdit);
+            tsbLineCreate.Checked = (activeButton == tsbLineCreate);
         }
 
 
@@ -108,12 +137,29 @@ namespace UI
             lastMousePos = e.Location;
             mouseDownPos = e.Location;
 
+            if (currentMode == InteractionMode.LineCreate &&
+                e.Button == MouseButtons.Right)
+            {
+                bool cancelled = myOCCTProxy != null &&
+                    myOCCTProxy.CancelLineCreateLine();
+
+                LogMessage(cancelled
+                    ? "已取消当前直线，请重新指定第一点。"
+                    : "当前没有待取消的直线。");
+
+                return;
+            }
+
             if (e.Button == MouseButtons.Left)
             {
-                isRotating = true; // 左键按下，旋转
+                // 直线绘制模式下左键用于落点，不启动视图旋转。
+                isRotating =
+                    currentMode != InteractionMode.LineCreate;
+
                 if (myOCCTProxy != null)
                 {
-                    myOCCTProxy.StartRotation(e.X, e.Y);
+                    if (isRotating)
+                        myOCCTProxy.StartRotation(e.X, e.Y);
                 }
             }
             else if (e.Button == MouseButtons.Middle)
@@ -128,6 +174,14 @@ namespace UI
         private void Panel2D_MouseMove(object sender, MouseEventArgs e)
         {
             if (myOCCTProxy == null) return;
+
+            if (currentMode == InteractionMode.LineCreate &&
+                !isPanning)
+            {
+                myOCCTProxy.UpdateLineCreatePreview(e.X, e.Y);
+                lastMousePos = e.Location;
+                return;
+            }
 
             // 如果鼠标处于按住拖拽的状态，执行相机视角变换
             if (isRotating)
@@ -166,6 +220,13 @@ namespace UI
 
                 if (dx < 3 && dy < 3)
                 {
+                    // 直线绘制模式直接使用屏幕坐标完成平面求交和吸附。
+                    if (currentMode == InteractionMode.LineCreate)
+                    {
+                        HandleLineCreateClick(e.X, e.Y);
+                        return;
+                    }
+
                     // === 点击：执行 OCC 选中高亮 ===
                     if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
                         myOCCTProxy.ShiftSelect();
@@ -173,6 +234,12 @@ namespace UI
                         myOCCTProxy.Select();
 
                     // === 业务状态 ===
+                    // === 拓扑边自动匹配和缝合 ===
+                    if (currentMode == InteractionMode.TopologyEdit)
+                    {
+                        HandleTopologyEdgeClick();
+                        return;
+                    }
                     //===线条自动合并===
                     if (currentMode == InteractionMode.AutoCombineLines)
                     {
@@ -458,6 +525,32 @@ namespace UI
                 }
             }
         }
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape &&
+                currentMode == InteractionMode.LineCreate)
+            {
+                bool cancelled = myOCCTProxy != null &&
+                    myOCCTProxy.CancelLineCreateLine();
+
+                if (cancelled)
+                {
+                    LogMessage("已取消当前直线，请重新指定第一点。");
+                }
+                else
+                {
+                    SwitchInteractionMode(
+                        InteractionMode.Normal,
+                        null);
+                    LogMessage("已退出直线绘制模式。");
+                }
+
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         private void Panel2D_MouseWheel(object sender, MouseEventArgs e)
         {
             if (myOCCTProxy == null) return;

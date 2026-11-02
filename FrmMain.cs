@@ -25,9 +25,12 @@ namespace UI
             InitializeComponent();
             myOCCTProxy = new OCCTProxy();
             InitPanel2DLayout();
+            InitializeTopologyEditWindow();
         }
         private int componentCounter = 1;        // 记录 Component 的数量
         private TreeNode currentComponentNode = null; 
+        // 手工直线的当前目标图层，与面创建使用的 Current Component 相互独立。
+        private TreeNode currentLineLayerNode = null;
 
         // 几何处理统一容差（当前模型单位为 mm）：线端点吸附、线打断和制面共用。
         private double geometryTolerance = 0.01;
@@ -74,6 +77,7 @@ namespace UI
                 return;
             }
             globalShapeId = 1;
+            currentLineLayerNode = null;
             layerShapesMap.Clear();
             this.treeView1.Nodes.Clear();
             if (myOCCTProxy !=null)
@@ -506,7 +510,11 @@ namespace UI
             if (success)
             {
                 // 5. 将新生成的面放入当前 Active 的 Component 树节点中
-                TreeNode faceNode = new TreeNode($"面 {faceCounter++}");
+                TreeNode faceNode = new TreeNode($"面 {faceCounter++}")
+                {
+                    Tag = newFaceId,
+                    ForeColor = compColor
+                };
                 currentComponentNode.Nodes.Add(faceNode);
 
                 // 将面的 ID 登记在当前 Component 的花名册里
@@ -552,6 +560,389 @@ namespace UI
                 SwitchInteractionMode(InteractionMode.Normal, null);
                 LogMessage("已退出帘线创建模式。");
             }
+        }
+
+        private void tsbLineCreate_Click(object sender, EventArgs e)
+        {
+            if (currentMode == InteractionMode.LineCreate)
+            {
+                SwitchInteractionMode(InteractionMode.Normal, null);
+                LogMessage("已退出直线绘制模式，已完成的直线予以保留。");
+                return;
+            }
+
+            EnterLineCreateMode();
+        }
+
+        private void EnterLineCreateMode()
+        {
+            if (currentMode == InteractionMode.TopologyEdit)
+                FinishTopologyEditSession();
+
+            if (!IsLineDrawingLayerNode(currentLineLayerNode))
+            {
+                MessageBox.Show(
+                    "尚未设置当前绘图图层。\n" +
+                    "请在左侧模型树中右键任一图层，选择“设置为当前 (Make Current)”。",
+                    "直线绘制",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (myOCCTProxy == null ||
+                !myOCCTProxy.BeginLineCreate(geometryTolerance))
+            {
+                MessageBox.Show(
+                    "无法进入直线绘制模式，请确认二维视图已经初始化。",
+                    "直线绘制",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            SwitchInteractionMode(
+                InteractionMode.LineCreate,
+                tsbLineCreate);
+
+            LogMessage(
+                $"进入直线绘制模式，直线将保存到 {GetLineLayerName(currentLineLayerNode)}。" +
+                "请指定第一点，移动鼠标预览后再指定第二点；靠近现有线段时会自动吸附。");
+        }
+
+        private void HandleLineCreateClick(int x, int y)
+        {
+            int[] result = myOCCTProxy.AddLineCreatePoint(
+                x,
+                y,
+                globalShapeId);
+
+            if (result == null || result.Length < 2)
+            {
+                LogMessage("直线绘制失败：底层没有返回有效结果。");
+                return;
+            }
+
+            switch (result[0])
+            {
+                case 1:
+                    LogMessage("已确定直线第一点，请指定第二点。");
+                    break;
+
+                case 2:
+                    // 每次完成直线时读取当前图层，因此绘制期间执行 Make Current
+                    // 也会从下一条直线开始立即生效。
+                    layerShapesMap[currentLineLayerNode].Add(result[1]);
+                    globalShapeId = Math.Max(globalShapeId, result[1] + 1);
+                    LogMessage(
+                        $"直线绘制成功（ID: {result[1]}），已保存到 " +
+                        $"{GetLineLayerName(currentLineLayerNode)}。" +
+                        "按 Esc 或再次点击按钮退出。");
+                    break;
+
+                case 0:
+                    LogMessage("当前光标无法投影到图纸平面，请调整视角后重试。");
+                    break;
+
+                case -2:
+                    LogMessage("两个点距离过近，请重新指定第二点。");
+                    break;
+
+                case -4:
+                    LogMessage("新直线 ID 已被占用，请重试。");
+                    break;
+
+                default:
+                    LogMessage("OCC 直线创建失败，请重新指定两个点。");
+                    break;
+            }
+        }
+
+        private FrmTopologyEdit topologyEditForm;
+        private TreeNode topologyEditingComponentNode;
+        private List<int> topologyOriginalShapeIds =
+            new List<int>();
+
+        private void InitializeTopologyEditWindow()
+        {
+            topologyEditForm =
+                new FrmTopologyEdit();
+
+            topologyEditForm.Tolerance =
+                geometryTolerance;
+
+            topologyEditForm.FinishRequested +=
+                topologyEditForm_FinishRequested;
+
+            topologyEditForm.CancelRequested +=
+                topologyEditForm_CancelRequested;
+        }
+
+        private void tsbTopologyEdit_Click_1(object sender, EventArgs e)
+        {
+            if (currentMode ==InteractionMode.TopologyEdit)
+            {
+                FinishTopologyEditSession();
+            }
+            else
+            {
+                EnterTopologyEditMode();
+            }
+        }
+
+        private void topologyEditForm_FinishRequested(object sender,EventArgs e)
+        {
+            FinishTopologyEditSession();
+        }
+
+        private void topologyEditForm_CancelRequested(object sender,EventArgs e)
+        {
+            CancelTopologyEditSession();
+        }
+
+        private void EnterTopologyEditMode()
+        {
+            if (currentComponentNode == null ||
+                !currentComponentNode.Text.StartsWith(
+                    "Component",
+                    StringComparison.Ordinal))
+            {
+                MessageBox.Show(
+                    "请先在模型树中选择需要进行拓扑编辑的 Component。",
+                    "拓扑编辑",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            List<int> componentShapeIds;
+
+            if (!layerShapesMap.TryGetValue(
+                currentComponentNode,
+                out componentShapeIds) ||
+                componentShapeIds == null ||
+                componentShapeIds.Count == 0)
+            {
+                MessageBox.Show(
+                    "当前 Component 中没有可以进行拓扑编辑的面。",
+                    "拓扑编辑",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            double tolerance =
+                 topologyEditForm.Tolerance;
+
+            int[] shapeIds =
+                componentShapeIds.ToArray();
+
+            bool success =
+                myOCCTProxy.BeginTopologyEdit(
+                    shapeIds,
+                    tolerance);
+
+            if (!success)
+            {
+                MessageBox.Show(
+                    "没有找到可以编辑的面拓扑边。",
+                    "拓扑编辑",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            topologyEditingComponentNode =
+                currentComponentNode;
+
+            topologyOriginalShapeIds =
+                new List<int>(shapeIds);
+
+            SwitchInteractionMode(
+                InteractionMode.TopologyEdit,
+                 tsbTopologyEdit);
+
+            string componentName =
+                currentComponentNode.Text
+                .Replace(" (Current)", "")
+                .Replace(" [已隐藏]", "");
+
+            topologyEditForm.ComponentName =componentName;
+
+            topologyEditForm.CurrentEdgeText = "尚未选择";
+
+            topologyEditForm.StatusText ="请选择一条红色自由边。\r\n" +"程序将自动寻找匹配边并完成缝合。";
+
+            topologyEditForm.ShowFor(this);
+
+            LogMessage(
+                "进入拓扑编辑模式：请选择需要缝合的红色自由边。");
+        }
+
+
+        // 在 Panel2D_MouseUp 中点击拓扑覆盖边后调用
+        private void HandleTopologyEdgeClick()
+        {
+            if (myOCCTProxy == null)
+                return;
+
+            double tolerance =
+                topologyEditForm.Tolerance;
+
+            int[] result =
+                myOCCTProxy.SewSelectedTopologyEdge(
+                    tolerance);
+
+            if (result == null || result.Length < 3)
+            {
+                topologyEditForm.StatusText =
+                    "拓扑操作失败：底层没有返回有效结果。";
+                return;
+            }
+
+            int status = result[0];
+            int keptShapeId = result[1];
+            int removedShapeId = result[2];
+
+            switch (status)
+            {
+                // 红色自由边缝合成功，生成绿色共享边
+                case 1:
+                    {
+                        if (topologyEditingComponentNode != null &&
+                            layerShapesMap.ContainsKey(
+                                topologyEditingComponentNode))
+                        {
+                            List<int> currentIds =
+                                layerShapesMap[
+                                    topologyEditingComponentNode];
+
+                            if (removedShapeId >= 0)
+                                currentIds.Remove(removedShapeId);
+
+                            if (!currentIds.Contains(keptShapeId))
+                                currentIds.Add(keptShapeId);
+                        }
+
+                        topologyEditForm.CurrentEdgeText ="绿色共享边";
+
+                        topologyEditForm.StatusText =
+                            "边缝合成功。\r\n" +
+                            "对应的两条自由边已经变成一条绿色共享边。";
+
+                        LogMessage(
+                            $"拓扑操作成功：保留 Shape {keptShapeId}，" +
+                            $"合并 Shape {removedShapeId}。");
+
+                        break;
+                    }
+
+                // 点击的边已经是共享边
+                case 2:
+                    {
+                        topologyEditForm.CurrentEdgeText ="绿色共享边";
+
+                        topologyEditForm.StatusText =
+                            "当前边已经是共享边，不需要重复缝合。";
+
+                        LogMessage("当前拓扑边已经完成缝合。");
+                        break;
+                    }
+
+                case 0:
+                    {
+                        topologyEditForm.StatusText =
+                            "没有选中拓扑边，请直接点击红色自由边。";
+                        break;
+                    }
+
+                case -1:
+                    {
+                        topologyEditForm.StatusText =
+                            $"没有找到匹配边。\r\n" +
+                            $"请检查间隙是否超过 {tolerance:0.####} mm。";
+
+                        LogMessage("拓扑缝合失败：没有找到匹配自由边。");
+                        break;
+                    }
+
+                case -2:
+                    {
+                        topologyEditForm.StatusText =
+                            "找到多个相似的候选边，无法自动确定目标。";
+
+                        LogMessage("拓扑缝合失败：匹配边存在歧义。");
+                        break;
+                    }
+
+                case -3:
+                    {
+                        topologyEditForm.StatusText =
+                            "OCC 缝合失败，或者缝合后没有形成共享边。";
+
+                        LogMessage("拓扑缝合失败：没有形成有效共享边。");
+                        break;
+                    }
+
+                default:
+                    {
+                        topologyEditForm.StatusText =
+                            "当前对象不是有效拓扑边。";
+                        break;
+                    }
+            }
+
+            myOCCTProxy.UpdateCurrentViewer();
+        }
+
+
+        private void FinishTopologyEditSession()
+        {
+            if (myOCCTProxy != null)
+                myOCCTProxy.FinishTopologyEdit();
+
+            topologyEditForm.HideToolWindow();
+            SwitchInteractionMode(
+                InteractionMode.Normal,
+                null,true);
+
+            topologyEditingComponentNode = null;
+            topologyOriginalShapeIds.Clear();
+
+            LogMessage("拓扑编辑完成。");
+        }
+
+
+        private void CancelTopologyEditSession()
+        {
+            if (myOCCTProxy != null)
+                myOCCTProxy.CancelTopologyEdit();
+
+            // 恢复 C# Component 中原来的 Shape ID
+            if (topologyEditingComponentNode != null &&
+                layerShapesMap.ContainsKey(
+                    topologyEditingComponentNode))
+            {
+                List<int> currentIds =
+                    layerShapesMap[topologyEditingComponentNode];
+
+                currentIds.Clear();
+                currentIds.AddRange(
+                    topologyOriginalShapeIds);
+            }
+
+            topologyEditForm.HideToolWindow();
+            SwitchInteractionMode(
+                InteractionMode.Normal,
+                null,true);
+
+            topologyEditingComponentNode = null;
+            topologyOriginalShapeIds.Clear();
+
+            LogMessage("已取消拓扑编辑，原始面已经恢复。");
         }
     }
 }

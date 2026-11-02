@@ -69,8 +69,28 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="FrmMain.TreeView.cs" />
-    <Compile Include="FrmMain.InterfaceInteraction.cs" />
+    <Compile Include="FrmParametricTireInput.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmParametricTireInput.Designer.cs">
+      <DependentUpon>FrmParametricTireInput.cs</DependentUpon>
+    </Compile>
+    <Compile Include="TireSectionParameterSet.cs" />
+    <Compile Include="FrmTopologyEdit.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmTopologyEdit.Designer.cs">
+      <DependentUpon>FrmTopologyEdit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FrmMain.TreeView.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmMain.InterfaceInteraction.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmMain.Parametric.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="FrmMain.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -79,8 +99,11 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="FrmMain.resx">
-      <DependentUpon>FrmMain.cs</DependentUpon>
+    <EmbeddedResource Include="FrmParametricTireInput.resx">
+      <DependentUpon>FrmParametricTireInput.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FrmTopologyEdit.resx">
+      <DependentUpon>FrmTopologyEdit.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -116,5 +139,23 @@
       <Name>OCCT</Name>
     </ProjectReference>
   </ItemGroup>
+  <Target Name="GenerateTrustedFrmMainResource"
+          BeforeTargets="PrepareResourceNames">
+    <PropertyGroup>
+      <_FrmMainResourceSource>$(MSBuildProjectDirectory)\FrmMain.resx</_FrmMainResourceSource>
+      <_FrmMainResourceOutput>$(IntermediateOutputPath)UI.FrmMain.resources</_FrmMainResourceOutput>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="&quot;$(TargetFrameworkSDKToolsDirectory)ResGen.exe&quot; /allowUntrustedFiles &quot;$(_FrmMainResourceSource)&quot; &quot;$(_FrmMainResourceOutput)&quot;" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(_FrmMainResourceOutput)">
+        <Type>Non-Resx</Type>
+        <WithCulture>false</WithCulture>
+        <ManifestResourceName>UI.FrmMain</ManifestResourceName>
+        <LogicalName>UI.FrmMain.resources</LogicalName>
+      </EmbeddedResource>
+      <FileWrites Include="$(_FrmMainResourceOutput)" />
+    </ItemGroup>
+  </Target>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

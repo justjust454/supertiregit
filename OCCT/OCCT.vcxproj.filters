@@ -5,10 +5,75 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Internal">
+      <UniqueIdentifier>{84bc8786-bc18-419b-bcfe-c5f0ab8d61c3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Proxy">
+      <UniqueIdentifier>{5af4514f-6b5e-459b-810d-e8f324a9f1d1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="OCCT.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="OCCTState.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.BasicGeometry.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.CordBuild.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.CurveEdit.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.FaceBuild.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.ParametricTire.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.Selection.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.StepExport.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.TopologyEdit.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.Viewer.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.Visibility.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OCCT.Includes.h" />
+    <ClInclude Include="OCCTProxy.h" />
+    <ClInclude Include="OCCTState.h" />
+    <ClInclude Include="ParametricTireSpec.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Internal\OCCT.TopologyHelpers.inl">
+      <Filter>Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="Internal\OCCT.CordHelpers.inl">
+      <Filter>Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="Internal\OCCT.CurveHelpers.inl">
+      <Filter>Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="Internal\OCCT.FaceGraphHelpers.inl">
+      <Filter>Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="Internal\OCCT.LineCreateHelpers.inl">
+      <Filter>Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="Internal\OCCT.ParametricTireHelpers.inl">
+      <Filter>Internal</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -49,7 +49,7 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CLRSupport>true</CLRSupport>
@@ -74,7 +74,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>..\dwg-to-stp\MAIN</OutDir>
+    <OutDir>..\dwg-to-stp\MAIN\</OutDir>
+    <IncludePath>$(ProjectDir)..\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Lenovo\Desktop\s2\SuperTire-Preprocess - 2026.8.11\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\win64\vc14\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>..\dwg-to-stp\MAIN\Release\</OutDir>
     <IncludePath>D:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\inc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\win64\vc14\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
@@ -103,7 +108,7 @@ TKGeomBase.lib
 ;TKG3d.lib
 ;TKG2d.lib;
 TKBO.lib;TKShHealing.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>D:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\win64\vc14\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\win64\vc14\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -130,11 +135,37 @@ TKBO.lib;TKShHealing.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies />
+      <AdditionalDependencies>TKXCAF.lib;TKVCAF.lib;TKXDESTEP.lib;TKSTEP.lib;TKXSBase.lib;TKLCAF.lib;TKCAF.lib;TKCDF.lib;TKV3d.lib;TKService.lib;TKBRep.lib;TKMath.lib;TKernel.lib;TKTopAlgo.lib;TKGeomBase.lib;TKGeomAlgo.lib;TKG3d.lib;TKG2d.lib;TKBO.lib;TKShHealing.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\OpenCASCADE-7.7.0-vc14-64\opencascade-7.7.0\win64\vc14\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="OCCT.cpp" />
+    <ClCompile Include="OCCTState.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.BasicGeometry.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.CordBuild.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.CurveEdit.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.FaceBuild.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.ParametricTire.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.Selection.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.StepExport.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.TopologyEdit.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.Viewer.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.Visibility.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OCCT.Includes.h" />
+    <ClInclude Include="OCCTProxy.h" />
+    <ClInclude Include="OCCTState.h" />
+    <ClInclude Include="ParametricTireSpec.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Internal\OCCT.CordHelpers.inl" />
+    <ClInclude Include="Internal\OCCT.CurveHelpers.inl" />
+    <ClInclude Include="Internal\OCCT.FaceGraphHelpers.inl" />
+    <ClInclude Include="Internal\OCCT.LineCreateHelpers.inl" />
+    <ClInclude Include="Internal\OCCT.ParametricTireHelpers.inl" />
+    <ClInclude Include="Internal\OCCT.TopologyHelpers.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
