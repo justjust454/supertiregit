@@ -88,6 +88,9 @@
     <Compile Include="FrmMain.InterfaceInteraction.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="FrmMain.Circle.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="FrmMain.Parametric.cs">
       <SubType>Form</SubType>
     </Compile>

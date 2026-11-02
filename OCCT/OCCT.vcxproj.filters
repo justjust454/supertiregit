@@ -22,6 +22,9 @@
     <ClCompile Include="Proxy\OCCTProxy.BasicGeometry.cpp">
       <Filter>Proxy</Filter>
     </ClCompile>
+    <ClCompile Include="Proxy\OCCTProxy.Circle.cpp">
+      <Filter>Proxy</Filter>
+    </ClCompile>
     <ClCompile Include="Proxy\OCCTProxy.CordBuild.cpp">
       <Filter>Proxy</Filter>
     </ClCompile>

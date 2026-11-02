@@ -66,6 +66,7 @@ Class OCCTProxy: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
     InitOCCTProxy(): PrivateScope, Public, HideBySig
     CreateArcByCenter(Int32, Double, Double, Double, Double, Double, Double): PrivateScope, Public, HideBySig
     CreatePolyline(Int32, Double[], Boolean(HasFieldMarshal)): PrivateScope, Public, HideBySig
+    CreateCircle(Int32, Double, Double, Double, Double): PrivateScope, Public, HideBySig
     AutoCombineLines(Int32, Int32): PrivateScope, Public, HideBySig
     CombineLines(Int32, Int32, Int32): PrivateScope, Public, HideBySig
     SplitLine(Int32, Int32, Int32, Double): PrivateScope, Public, HideBySig

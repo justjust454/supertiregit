@@ -58,6 +58,12 @@ public:
         double startAngle,
         double endAngle);
     void CreatePolyline(int id, array<double>^ coords, bool isClosed);
+    bool CreateCircle(
+        int id,
+        double cx,
+        double cy,
+        double cz,
+        double radius);
 
     // Curve edit
     array<int>^ AutoCombineLines(int startId, int newId);

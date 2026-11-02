@@ -143,6 +143,7 @@ TKBO.lib;TKShHealing.lib;%(AdditionalDependencies)</AdditionalDependencies>
     <ClCompile Include="OCCT.cpp" />
     <ClCompile Include="OCCTState.cpp" />
     <ClCompile Include="Proxy\OCCTProxy.BasicGeometry.cpp" />
+    <ClCompile Include="Proxy\OCCTProxy.Circle.cpp" />
     <ClCompile Include="Proxy\OCCTProxy.CordBuild.cpp" />
     <ClCompile Include="Proxy\OCCTProxy.CurveEdit.cpp" />
     <ClCompile Include="Proxy\OCCTProxy.FaceBuild.cpp" />
